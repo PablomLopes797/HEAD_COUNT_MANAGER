@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
+        /* ... (mantenha todo o CSS fornecido anteriormente) ... */
         :root {
             --bg-primary: #ffffff;
             --bg-secondary: #f5f7fc;
@@ -249,14 +250,102 @@
             const TURNOS = {
                 'CD ARUJA - OPERACOES I': { inicio: '05:00', fim: '15:20' },
                 'CD ARUJA - OPERACOES II': { inicio: '12:40', fim: '23:00' },
-                'CD ARUJA - OPERACOES III': { inicio: '21:00', fim: '06:00' } // atravessa meia-noite
+                'CD ARUJA - OPERACOES III': { inicio: '21:00', fim: '06:00' }
             };
 
             let currentUser = null;
             let dadosHC = [], dadosSuricato = [], dadosJustificativas = [];
             let dataInicio, dataFim;
 
-            // Efeito Matrix
+            // ========== FUNÇÕES DE PARSE DE DATA/HORA ==========
+            function parseDataHora(str) {
+                if (!str) return null;
+                str = String(str).trim();
+                // Formato DD/MM/YYYY HH:MM:SS (ex: 05/04/2026 21:43:00)
+                const brRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/;
+                const matchBr = str.match(brRegex);
+                if (matchBr) {
+                    const [_, d, m, y, hh, mm, ss] = matchBr;
+                    return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss || '00'}`);
+                }
+                // Formato ISO
+                const isoRegex = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/;
+                const matchIso = str.match(isoRegex);
+                if (matchIso) {
+                    return new Date(str);
+                }
+                // Fallback
+                const d = new Date(str);
+                return isNaN(d) ? null : d;
+            }
+
+            function extrairData(dtHora) {
+                if (!dtHora) return null;
+                const str = String(dtHora).trim();
+                // Se for DD/MM/YYYY HH:MM:SS
+                const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+                if (brMatch) {
+                    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`; // YYYY-MM-DD
+                }
+                // Se for ISO
+                const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                    return isoMatch[0];
+                }
+                return null;
+            }
+
+            function normalizarData(dataStr) {
+                if (!dataStr) return null;
+                const str = String(dataStr).trim();
+                // DD/MM/YYYY
+                const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+                // YYYY-MM-DD
+                const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (isoMatch) return str;
+                return null;
+            }
+
+            // ========== LÓGICA DE TURNO ==========
+            function estaNoTurno(centro, dataStr, dtHoraOriginal) {
+                const turno = TURNOS[centro];
+                if (!turno) return false;
+                const dataBase = new Date(dataStr + 'T00:00:00');
+                const inicio = new Date(dataStr + 'T' + turno.inicio + ':00');
+                let fim = new Date(dataStr + 'T' + turno.fim + ':00');
+                if (turno.fim === '06:00') {
+                    // Turno da noite atravessa meia-noite
+                    fim = new Date(dataBase.getTime() + 86400000 + 6*3600000); // próximo dia 06:00
+                }
+                const registro = parseDataHora(dtHoraOriginal);
+                if (!registro) return false;
+                return registro >= inicio && registro <= fim;
+            }
+
+            function obterStatus(matricula, dataStr) {
+                const colaborador = dadosHC.find(c => c.Matricula === matricula);
+                if (!colaborador) return 'FA';
+                const centro = colaborador['Descrição do centro de custo'];
+                if (!CENTROS_VALIDOS.includes(centro)) return 'FA';
+                // Verifica presença no SURICATO dentro do turno
+                const presente = dadosSuricato.some(s => {
+                    if (s.MATRICULA !== matricula) return false;
+                    const dataRegistro = extrairData(s.DTA_HORA);
+                    if (dataRegistro !== dataStr) return false;
+                    return estaNoTurno(centro, dataStr, s.DTA_HORA);
+                });
+                if (presente) return 'P';
+                // Verifica justificativa
+                const just = dadosJustificativas.find(j => {
+                    const matColab = j['MATRICULA COLAB'];
+                    const dataJust = normalizarData(j.DATA);
+                    return matColab === matricula && dataJust === dataStr;
+                });
+                return just ? (just.MOTIVO || 'Justificada') : 'FA';
+            }
+
+            // ========== EFEITO MATRIX ==========
             (function() {
                 const canvas = document.getElementById('matrixCanvas'), ctx = canvas.getContext('2d');
                 const video = document.getElementById('loginVideo'), userField = document.getElementById('loginUser');
@@ -382,7 +471,9 @@
                             if(centro===CENTROS_VALIDOS[0])hora='08:00';
                             else if(centro===CENTROS_VALIDOS[1])hora='15:00';
                             else hora='23:00';
-                            dadosSuricato.push({DTA_HORA:dia+'T'+hora+':00',MATRICULA:colab.Matricula});
+                            // Formato brasileiro simulado
+                            const [y,m,diaNum]=dia.split('-');
+                            dadosSuricato.push({DTA_HORA:`${diaNum}/${m}/${y} ${hora}:00`,MATRICULA:colab.Matricula});
                         }
                     });
                 }
@@ -398,26 +489,6 @@
             }
 
             function getDiasPeriodo(){ const dias=[]; const cur=new Date(dataInicio+'T00:00:00'); const fim=new Date(dataFim+'T00:00:00'); while(cur<=fim){dias.push(cur.toISOString().split('T')[0]);cur.setDate(cur.getDate()+1);} return dias; }
-
-            function estaNoTurno(centro,dataStr,dtHora){
-                const turno=TURNOS[centro]; if(!turno)return false;
-                const dia=new Date(dataStr+'T00:00:00');
-                const inicio=new Date(dataStr+'T'+turno.inicio+':00');
-                let fim=new Date(dataStr+'T'+turno.fim+':00');
-                if(turno.fim==='06:00')fim=new Date(dia.getTime()+86400000+6*3600000); // próximo dia 06:00
-                const reg=new Date(dtHora);
-                return reg>=inicio&&reg<=fim;
-            }
-
-            function obterStatus(matricula,dataStr){
-                const centro=dadosHC.find(c=>c.Matricula===matricula)?.['Descrição do centro de custo'];
-                if(!centro)return 'FA';
-                const presente=dadosSuricato.some(s=>s.MATRICULA===matricula&&extrairData(s.DTA_HORA)===dataStr&&estaNoTurno(centro,dataStr,s.DTA_HORA));
-                if(presente)return 'P';
-                const just=dadosJustificativas.find(j=>j['MATRICULA COLAB']===matricula&&j.DATA===dataStr);
-                return just?just.MOTIVO:'FA';
-            }
-            function extrairData(dt){return dt?.substring(0,10);}
 
             function aplicarFiltroPeriodo(){
                 dataInicio=document.getElementById('dataInicio').value;
@@ -504,17 +575,13 @@
                         }
                     });
                 });
-                const chartOptions={responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}};
-                // Destroi anteriores
+                const chartOptions={responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},datalabels:{anchor:'end',align:'top',color:'#111',font:{weight:'bold'}}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}};
                 Object.values(chartInstances).forEach(c=>c.destroy());
-                // Dia semana
-                chartInstances.chartDiaSemana=new Chart(document.getElementById('chartDiaSemana'),{type:'bar',data:{labels:diaSemanaNome,datasets:[{label:'Faltas',data:diaSemanaNome.map(d=>faltasPorDia[d]),backgroundColor:'#3182ce'}]},options:chartOptions,plugins:[ChartDataLabels]});
-                // Cargo
+                chartInstances.chartDiaSemana=new Chart(document.getElementById('chartDiaSemana'),{type:'bar',data:{labels:diaSemanaNome,datasets:[{label:'Faltas',data:diaSemanaNome.map(d=>faltasPorDia[d]),backgroundColor:'#3182ce'}]},options:chartOptions});
                 const cargos=Object.entries(faltasPorCargo).sort((a,b)=>b[1]-a[1]);
-                chartInstances.chartCargo=new Chart(document.getElementById('chartCargo'),{type:'bar',data:{labels:cargos.map(c=>c[0]),datasets:[{data:cargos.map(c=>c[1]),backgroundColor:'#dd6b20'}]},options:{...chartOptions,indexAxis:'y'},plugins:[ChartDataLabels]});
-                // Centro
+                chartInstances.chartCargo=new Chart(document.getElementById('chartCargo'),{type:'bar',data:{labels:cargos.map(c=>c[0]),datasets:[{data:cargos.map(c=>c[1]),backgroundColor:'#dd6b20'}]},options:{...chartOptions,indexAxis:'y',plugins:{...chartOptions.plugins,datalabels:{...chartOptions.plugins.datalabels,align:'right'}}}});
                 const centros=Object.entries(faltasPorCentro).sort((a,b)=>b[1]-a[1]);
-                chartInstances.chartCentroCusto=new Chart(document.getElementById('chartCentroCusto'),{type:'bar',data:{labels:centros.map(c=>c[0]),datasets:[{data:centros.map(c=>c[1]),backgroundColor:'#319795'}]},options:{...chartOptions,indexAxis:'y'},plugins:[ChartDataLabels]});
+                chartInstances.chartCentroCusto=new Chart(document.getElementById('chartCentroCusto'),{type:'bar',data:{labels:centros.map(c=>c[0]),datasets:[{data:centros.map(c=>c[1]),backgroundColor:'#319795'}]},options:{...chartOptions,indexAxis:'y',plugins:{...chartOptions.plugins,datalabels:{...chartOptions.plugins.datalabels,align:'right'}}}});
             }
 
             // Upload
