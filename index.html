@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Headcount Manager | Absenteísmo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f7fc;
+            --bg-card: #ffffff;
+            --bg-sidebar: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-muted: #a0aec0;
+            --accent-blue: #3182ce;
+            --accent-teal: #319795;
+            --accent-amber: #dd6b20;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+            --radius: 14px;
+            --sidebar-width: 260px;
+            --transition: 0.2s ease;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        .dark-mode {
+            --bg-primary: #0f1119;
+            --bg-secondary: #1a1c2b;
+            --bg-card: #1e2132;
+            --bg-sidebar: #151724;
+            --border-color: #2d3148;
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --text-muted: #718096;
+            --accent-blue: #63b3ed;
+            --accent-teal: #4fd1c5;
+            --accent-amber: #f6ad55;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            display: flex;
+            min-height: 100vh;
+            transition: background var(--transition), color var(--transition);
+            letter-spacing: -0.01em;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+            transition: background var(--transition), border var(--transition);
+        }
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+        .sidebar-header h2 {
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+        .sidebar-header span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        .sidebar-nav {
+            flex: 1;
+            padding: 0 12px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            margin-bottom: 4px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.92rem;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-decoration: none;
+            letter-spacing: -0.01em;
+        }
+        .nav-item i {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+        .nav-item:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        .nav-item.active {
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+        }
+        .dark-mode .nav-item.active {
+            box-shadow: 0 4px 12px rgba(99, 179, 237, 0.3);
+        }
+        .sidebar-footer {
+            padding: 20px 20px 0;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 16px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            padding: 8px 0;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 28px 32px 40px;
+            transition: margin var(--transition);
+            width: calc(100% - var(--sidebar-width));
+        }
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .page-title h1 {
+            font-weight: 800;
+            font-size: 1.9rem;
+            letter-spacing: -0.03em;
+        }
+        .page-title p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+            transition: all var(--transition);
+        }
+        .kpi-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        .kpi-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .kpi-value {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: var(--text-primary);
+        }
+
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 20px;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 14px 18px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .filter-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .filter-group input {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+            font-size: 0.82rem;
+            outline: none;
+        }
+
+        .table-outer {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            background: var(--bg-card);
+        }
+        .table-scroll {
+            overflow-x: auto;
+            max-height: 60vh;
+        }
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            min-width: 100%;
+            font-size: 0.78rem;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: var(--bg-secondary);
+            padding: 12px 8px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        th.sticky-col {
+            z-index: 25;
+            background: var(--bg-secondary);
+        }
+        td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            font-family: var(--font-mono);
+            font-weight: 500;
+        }
+        td.sticky-col {
+            background: var(--bg-card);
+            font-family: var(--font-sans);
+            font-weight: 600;
+        }
+        .sticky-matricula {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            width: 130px;
+            min-width: 130px;
+            max-width: 130px;
+        }
+        .row-count td {
+            background: rgba(49, 130, 206, 0.02);
+        }
+        .dark-mode .row-count td {
+            background: rgba(99, 179, 237, 0.03);
+        }
+        .cell-high { color: #2f855a; }
+        .cell-low { color: #c05621; }
+        .dark-mode .cell-high { color: #68d391; }
+        .dark-mode .cell-low { color: #f6ad55; }
+
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 500;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all var(--transition);
+            background: var(--accent-blue);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:hover {
+            filter: brightness(1.1);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 220px;
+                --sidebar-width: 220px;
+            }
+            .main-content {
+                padding: 20px 12px;
+            }
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>Headcount Manager</h2>
+            <span>Painel Gerencial</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active" data-page="absenteismo">
+                <i class="fa-solid fa-user-slash"></i> Absenteísmo
+            </div>
+            <div class="nav-item" data-page="turnover">
+                <i class="fa-solid fa-rotate"></i> Turnover
+            </div>
+            <div class="nav-item" data-page="produtividade">
+                <i class="fa-solid fa-boxes-stacked"></i> Produtividade
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="theme-toggle" id="themeToggle">
+                <i class="fa-solid fa-moon"></i> <span>Modo Escuro</span>
+            </div>
+            <div style="margin-top:12px;">Desenvolvido por <strong>Pablo Martins Lopes</strong></div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" id="mainContent">
+        <!-- Absenteísmo page (active) -->
+        <div id="page-absenteismo">
+            <div class="page-header">
+                <div class="page-title">
+                    <h1>Absenteísmo</h1>
+                    <p>Monitoramento de ausências a partir da base SURICATO</p>
+                </div>
+                <button class="btn" onclick="recarregarDados()"><i class="fa-solid fa-rotate"></i> Atualizar dados</button>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-grid" id="kpiAbsenteismo">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total de Registros</div>
+                    <div class="kpi-value" id="kpiTotal">--</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);">no período</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Média Diária</div>
+                    <div class="kpi-value" id="kpiMedia">--</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);">eventos/dia</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Colaboradores Únicos</div>
+                    <div class="kpi-value" id="kpiUnicos">--</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);">no período</div>
+                </div>
+            </div>
+
+            <!-- Filtro de período -->
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label><i class="fa-solid fa-calendar"></i> De:</label>
+                    <input type="date" id="dataInicio" onchange="aplicarFiltroPeriodo()">
+                </div>
+                <div class="filter-group">
+                    <label>Até:</label>
+                    <input type="date" id="dataFim" onchange="aplicarFiltroPeriodo()">
+                </div>
+                <span style="font-size:0.75rem;color:var(--text-muted);" id="periodoInfo">(últimos 7 dias)</span>
+            </div>
+
+            <!-- Tabela -->
+            <div class="table-outer">
+                <div class="table-scroll" id="scrollTable">
+                    <table id="tabelaAbsenteismo">
+                        <thead id="theadAbs"></thead>
+                        <tbody id="tbodyAbs"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="footer">Dados carregados via Supabase • SURICATO</div>
+        </div>
+
+        <!-- Placeholder pages (ocultas) -->
+        <div id="page-turnover" style="display:none;"><h2>Turnover</h2><p>Em construção.</p></div>
+        <div id="page-produtividade" style="display:none;"><h2>Produtividade</h2><p>Em construção.</p></div>
+    </main>
+
+    <script>
+        (function() {
+            // Configuração Supabase
+            const SUPABASE_URL = 'https://tvrfetjhqxvxorzytpci.supabase.co/rest/v1/SURICATO';
+            // ⚠️ Substitua pela sua chave anônima real do Supabase
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTYwNjM4MDAsImV4cCI6MjAxMTYzOTgwMH0.placeholder'; 
+
+            // Estado
+            let dadosBrutos = [];
+            let dataInicio, dataFim;
+            let temaEscuro = false;
+
+            // Elementos
+            const dataInicioInput = document.getElementById('dataInicio');
+            const dataFimInput = document.getElementById('dataFim');
+            const periodoInfo = document.getElementById('periodoInfo');
+            const themeToggle = document.getElementById('themeToggle');
+            const body = document.body;
+
+            // Inicializar datas (últimos 7 dias)
+            function initDatas() {
+                const hoje = new Date();
+                const seteDiasAtras = new Date(hoje);
+                seteDiasAtras.setDate(hoje.getDate() - 6);
+                dataFim = hoje.toISOString().split('T')[0];
+                dataInicio = seteDiasAtras.toISOString().split('T')[0];
+                dataInicioInput.value = dataInicio;
+                dataFimInput.value = dataFim;
+                periodoInfo.textContent = `(${dataInicio} → ${dataFim})`;
+            }
+
+            // Função para buscar dados do Supabase
+            async function carregarDadosSupabase() {
+                try {
+                    const response = await fetch(SUPABASE_URL + '?select=*', {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                        }
+                    });
+                    if (!response.ok) throw new Error(`Status ${response.status}`);
+                    const data = await response.json();
+                    dadosBrutos = data;
+                    console.log('Dados carregados do Supabase:', data.length, 'registros');
+                } catch (error) {
+                    console.warn('Erro ao buscar Supabase, usando dados simulados:', error);
+                    gerarDadosSimulados();
+                }
+                aplicarFiltroPeriodo();
+            }
+
+            function gerarDadosSimulados() {
+                // Gera registros para 15 matrículas nos últimos 30 dias
+                const matriculas = ['1001','1002','1003','1004','1005','1006','1007','1008','1009','1010','1011','1012','1013','1014','1015'];
+                const hoje = new Date();
+                dadosBrutos = [];
+                for (let i = 0; i < 30; i++) {
+                    const d = new Date(hoje);
+                    d.setDate(d.getDate() - i);
+                    const dia = d.toISOString().split('T')[0];
+                    matriculas.forEach(mat => {
+                        // Número aleatório de registros (0-4) simulando batidas
+                        const registros = Math.floor(Math.random() * 5);
+                        for (let j = 0; j < registros; j++) {
+                            dadosBrutos.push({
+                                DTA_HORA: dia + 'T' + String(8 + Math.floor(Math.random()*10)).padStart(2,'0') + ':00:00',
+                                MATRICULA: mat
+                            });
+                        }
+                    });
+                }
+            }
+
+            function extrairData(dtHora) {
+                return dtHora.substring(0, 10);
+            }
+
+            function aplicarFiltroPeriodo() {
+                const inicio = dataInicioInput.value;
+                const fim = dataFimInput.value;
+                if (inicio && fim) {
+                    dataInicio = inicio;
+                    dataFim = fim;
+                    periodoInfo.textContent = `(${dataInicio} → ${dataFim})`;
+                }
+                renderizarTabela();
+                atualizarKPIs();
+            }
+
+            function getDiasUteis(inicio, fim) {
+                const dias = [];
+                const ini = new Date(inicio + 'T00:00:00');
+                const fi = new Date(fim + 'T00:00:00');
+                const cur = new Date(ini);
+                while (cur <= fi) {
+                    dias.push(cur.toISOString().split('T')[0]);
+                    cur.setDate(cur.getDate() + 1);
+                }
+                return dias;
+            }
+
+            function renderizarTabela() {
+                const dias = getDiasUteis(dataInicio, dataFim);
+                // Agrupa por MATRICULA
+                const agrupado = {};
+                dadosBrutos.forEach(reg => {
+                    const dia = extrairData(reg.DTA_HORA);
+                    if (dia >= dataInicio && dia <= dataFim) {
+                        if (!agrupado[reg.MATRICULA]) agrupado[reg.MATRICULA] = {};
+                        agrupado[reg.MATRICULA][dia] = (agrupado[reg.MATRICULA][dia] || 0) + 1;
+                    }
+                });
+                const matriculas = Object.keys(agrupado).sort();
+
+                // Cabeçalho
+                let theadHtml = '<tr><th class="sticky-col sticky-matricula">Matrícula</th>';
+                dias.forEach(d => {
+                    const partes = d.split('-');
+                    theadHtml += `<th>${partes[2]}/${partes[1]}</th>`;
+                });
+                theadHtml += '</tr>';
+                document.getElementById('theadAbs').innerHTML = theadHtml;
+
+                // Corpo
+                let tbodyHtml = '';
+                matriculas.forEach(mat => {
+                    tbodyHtml += `<tr class="row-count"><td class="sticky-col sticky-matricula"><strong>${mat}</strong></td>`;
+                    dias.forEach(d => {
+                        const val = agrupado[mat][d] || 0;
+                        let cls = '';
+                        if (val === 0) cls = 'cell-low';
+                        else if (val >= 3) cls = 'cell-high';
+                        tbodyHtml += `<td class="${cls}">${val}</td>`;
+                    });
+                    tbodyHtml += '</tr>';
+                });
+                if (matriculas.length === 0) {
+                    tbodyHtml += `<tr><td colspan="${dias.length+1}" style="text-align:center;padding:20px;">Nenhum dado no período.</td></tr>`;
+                }
+                document.getElementById('tbodyAbs').innerHTML = tbodyHtml;
+            }
+
+            function atualizarKPIs() {
+                const dias = getDiasUteis(dataInicio, dataFim);
+                let total = 0;
+                const matriculasSet = new Set();
+                dadosBrutos.forEach(reg => {
+                    const dia = extrairData(reg.DTA_HORA);
+                    if (dia >= dataInicio && dia <= dataFim) {
+                        total++;
+                        matriculasSet.add(reg.MATRICULA);
+                    }
+                });
+                const media = (total / dias.length).toFixed(1);
+                document.getElementById('kpiTotal').textContent = total;
+                document.getElementById('kpiMedia').textContent = media;
+                document.getElementById('kpiUnicos').textContent = matriculasSet.size;
+            }
+
+            function recarregarDados() {
+                carregarDadosSupabase();
+            }
+
+            // Navegação entre páginas
+            function navegar(pagina) {
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                document.querySelector(`.nav-item[data-page="${pagina}"]`).classList.add('active');
+                document.querySelectorAll('[id^="page-"]').forEach(p => p.style.display = 'none');
+                document.getElementById(`page-${pagina}`).style.display = 'block';
+            }
+
+            // Toggle tema escuro
+            function toggleTema() {
+                temaEscuro = !temaEscuro;
+                if (temaEscuro) {
+                    body.classList.add('dark-mode');
+                    themeToggle.querySelector('i').classList.replace('fa-moon', 'fa-sun');
+                    themeToggle.querySelector('span').textContent = 'Modo Claro';
+                } else {
+                    body.classList.remove('dark-mode');
+                    themeToggle.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+                    themeToggle.querySelector('span').textContent = 'Modo Escuro';
+                }
+            }
+
+            // Eventos
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const pagina = e.currentTarget.dataset.page;
+                    if (pagina) navegar(pagina);
+                });
+            });
+            themeToggle.addEventListener('click', toggleTema);
+
+            // Inicialização
+            initDatas();
+            carregarDadosSupabase();
+
+            // Expor funções globalmente
+            window.aplicarFiltroPeriodo = aplicarFiltroPeriodo;
+            window.recarregarDados = recarregarDados;
+        })();
+    </script>
+</body>
+</html>
