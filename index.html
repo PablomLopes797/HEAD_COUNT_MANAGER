@@ -3,197 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Headcount Manager | Absenteísmo</title>
+    <title>Headcount Manager | Absenteísmo & Produtividade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
+        /* ========== VARIÁVEIS E ESTILOS GLOBAIS ========== */
         :root {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f5f7fc;
-            --bg-card: #ffffff;
-            --bg-sidebar: #ffffff;
-            --border-color: #e2e8f0;
-            --text-primary: #1a202c;
-            --text-secondary: #4a5568;
-            --text-muted: #a0aec0;
-            --accent-blue: #3182ce;
-            --accent-teal: #319795;
-            --accent-amber: #dd6b20;
+            --bg: #ffffff;
+            --bg2: #f5f7fc;
+            --card: #ffffff;
+            --sidebar: #ffffff;
+            --border: #e2e8f0;
+            --text: #1a202c;
+            --text2: #4a5568;
+            --muted: #a0aec0;
+            --blue: #3182ce;
+            --teal: #319795;
+            --amber: #dd6b20;
             --red: #d64545;
             --green: #0f9d58;
             --orange: #e5972a;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow: 0 1px 3px rgba(0,0,0,0.04);
             --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
             --radius: 14px;
-            --sidebar-width: 260px;
+            --sw: 260px;
+            --font: 'Inter', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', monospace;
             --transition: 0.2s ease;
-            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
         }
         .dark-mode {
-            --bg-primary: #0f1119;
-            --bg-secondary: #1a1c2b;
-            --bg-card: #1e2132;
-            --bg-sidebar: #151724;
-            --border-color: #2d3148;
-            --text-primary: #e2e8f0;
-            --text-secondary: #a0aec0;
-            --text-muted: #718096;
-            --accent-blue: #63b3ed;
-            --accent-teal: #4fd1c5;
-            --accent-amber: #f6ad55;
+            --bg: #0f1119;
+            --bg2: #1a1c2b;
+            --card: #1e2132;
+            --sidebar: #151724;
+            --border: #2d3148;
+            --text: #e2e8f0;
+            --text2: #a0aec0;
+            --muted: #718096;
+            --blue: #63b3ed;
+            --teal: #4fd1c5;
+            --amber: #f6ad55;
             --red: #ef4444;
             --green: #22c55e;
             --orange: #f59e0b;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
-            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: var(--bg-primary); color: var(--text-primary);
-            font-family: var(--font-sans); display: flex; min-height: 100vh;
-            transition: background var(--transition), color var(--transition);
-            letter-spacing: -0.01em;
-        }
+        body { background: var(--bg); color: var(--text); font-family: var(--font); display: flex; min-height: 100vh; transition: background var(--transition), color var(--transition); letter-spacing: -0.01em; }
         /* LOGIN */
-        .login-overlay {
-            position: fixed; inset: 0; z-index: 1000; display: flex;
-            align-items: center; justify-content: center;
-            background: #000; overflow: hidden; transition: opacity 0.5s ease;
-        }
+        .login-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; transition: opacity 0.5s ease; }
         .login-overlay.fade-out { opacity: 0; pointer-events: none; }
         #loginVideo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
         #matrixCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none; }
-        .login-card {
-            position: relative; width: 400px; max-width: 92%;
-            background: rgba(15,25,60,.55); border: 1px solid rgba(255,255,255,.14);
-            border-radius: 20px; padding: 36px 34px 30px;
-            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-            box-shadow: 0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
-            animation: loginIn .5s cubic-bezier(.2,.9,.25,1); z-index: 2;
-        }
+        .login-card { position: relative; width: 400px; max-width: 92%; background: rgba(15,25,60,.55); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; padding: 36px 34px 30px; backdrop-filter: blur(18px); box-shadow: 0 30px 80px rgba(0,0,0,.45); animation: loginIn .5s ease; z-index: 2; }
         @keyframes loginIn { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .login-mark {
-            width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 18px;
-            background: linear-gradient(135deg, #3182ce, #5ec6ff);
-            display: flex; align-items: center; justify-content: center;
-            font-family: var(--font-mono); font-weight: 700; font-size: 18px; color: #fff;
-            box-shadow: 0 10px 30px rgba(49,130,206,.5);
-        }
+        .login-mark { width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 18px; background: linear-gradient(135deg, #3182ce, #5ec6ff); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 18px; color: #fff; box-shadow: 0 10px 30px rgba(49,130,206,.5); }
         .login-title { color: #fff; font-size: 19px; font-weight: 800; text-align: center; }
         .login-sub { color: rgba(255,255,255,.5); font-size: 12.5px; text-align: center; margin-top: 5px; margin-bottom: 26px; }
         .login-field { margin-bottom: 14px; }
         .login-field label { color: rgba(255,255,255,.55); font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
-        .login-field input {
-            width: 100%; padding: 12px 14px; margin-top: 6px; border-radius: 10px;
-            border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06);
-            color: #fff; font-size: 14.5px; outline: none;
-        }
+        .login-field input { width: 100%; padding: 12px 14px; margin-top: 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #fff; font-size: 14.5px; outline: none; }
         .login-field input:focus { border-color: #3182ce; background: rgba(255,255,255,.1); }
-        .login-btn {
-            width: 100%; margin-top: 8px; padding: 12px; border: 0; border-radius: 10px;
-            cursor: pointer; background: linear-gradient(135deg, #3182ce, #4472ff);
-            color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
+        .login-btn { width: 100%; margin-top: 8px; padding: 12px; border: 0; border-radius: 10px; cursor: pointer; background: linear-gradient(135deg, #3182ce, #4472ff); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .login-btn:hover { transform: translateY(-1px); }
         .login-btn:disabled { opacity: .6; }
-        .login-error {
-            margin-top: 14px; padding: 10px 12px; border-radius: 9px;
-            background: rgba(214,69,69,.15); border: 1px solid rgba(214,69,69,.4);
-            color: #ffb4b4; font-size: 12.5px; font-weight: 600; display: none; align-items: center; gap: 8px;
-        }
+        .login-error { margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: rgba(214,69,69,.15); border: 1px solid rgba(214,69,69,.4); color: #ffb4b4; font-size: 12.5px; font-weight: 600; display: none; align-items: center; gap: 8px; }
         .login-error.show { display: flex; }
         /* SIDEBAR */
-        .sidebar {
-            width: var(--sidebar-width); background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color); display: flex;
-            flex-direction: column; padding: 24px 0; position: fixed;
-            top: 0; left: 0; bottom: 0; z-index: 100;
-            box-shadow: var(--shadow-md); transition: background var(--transition), border var(--transition);
-        }
-        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 24px; }
+        .sidebar { width: var(--sw); background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 0; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; box-shadow: var(--shadow-md); transition: background var(--transition), border var(--transition); }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
         .sidebar-header h2 { font-weight: 700; font-size: 1.25rem; }
         .sidebar-nav { flex: 1; padding: 0 12px; }
-        .nav-item {
-            display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-            border-radius: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.92rem; cursor: pointer;
-        }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; color: var(--text2); font-weight: 500; font-size: 0.92rem; cursor: pointer; transition: all var(--transition); }
         .nav-item i { width: 20px; text-align: center; }
-        .nav-item:hover { background: var(--bg-secondary); }
-        .nav-item.active { background: var(--accent-blue); color: white; }
-        .sidebar-footer { padding: 20px 20px 0; border-top: 1px solid var(--border-color); font-size: 0.72rem; color: var(--text-muted); }
-        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: var(--bg-secondary); padding: 10px; border-radius: 10px; }
-        .user-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff; }
-        .theme-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; color: var(--text-secondary); font-size: 0.82rem; padding: 8px 0; }
-        .btn-logout { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 0.7rem; color: var(--text-muted); }
-        .btn-logout:hover { border-color: var(--accent-blue); }
-        .btn-change-password { background: none; border: none; cursor: pointer; color: var(--text-muted); margin-left: auto; font-size: 0.8rem; }
-        .btn-change-password:hover { color: var(--accent-blue); }
+        .nav-item:hover { background: var(--bg2); transform: translateX(4px); }
+        .nav-item.active { background: var(--blue); color: white; }
+        .sidebar-footer { padding: 20px 20px 0; border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--muted); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: var(--bg2); padding: 10px; border-radius: 10px; }
+        .user-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff; }
+        .theme-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; color: var(--text2); font-size: 0.82rem; padding: 8px 0; }
+        .btn-logout { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 0.7rem; color: var(--muted); }
+        .btn-change-password { background: none; border: none; cursor: pointer; color: var(--muted); margin-left: auto; font-size: 0.8rem; }
         /* MAIN */
-        .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 28px 32px 40px; width: calc(100% - var(--sidebar-width)); }
+        .main-content { flex: 1; margin-left: var(--sw); padding: 28px 32px 40px; width: calc(100% - var(--sw)); }
+        .view { display: none; }
+        .view.active { display: block; }
         .page-header { display: flex; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
         .page-title h1 { font-weight: 800; font-size: 1.9rem; }
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .kpi-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 18px 20px; }
-        .kpi-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
-        .kpi-value { font-family: var(--font-mono); font-weight: 700; font-size: 1.8rem; }
-        .filter-bar { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: center; background: var(--bg-card); padding: 14px 18px; border-radius: var(--radius); border: 1px solid var(--border-color); }
+        .kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; transition: all var(--transition); }
+        .kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .kpi-label { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+        .kpi-value { font-family: var(--mono); font-weight: 700; font-size: 1.8rem; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: center; background: var(--card); padding: 14px 18px; border-radius: var(--radius); border: 1px solid var(--border); }
         .filter-group { display: flex; align-items: center; gap: 8px; }
-        .filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
-        .filter-group input, .filter-group select {
-            background: var(--bg-secondary); border: 1px solid var(--border-color);
-            padding: 8px 12px; border-radius: 8px; font-family: var(--font-mono);
-            color: var(--text-primary); font-size: 0.82rem; outline: none;
-        }
-        .table-outer { border: 1px solid var(--border-color); border-radius: var(--radius); overflow: auto; background: var(--bg-card); max-height: 60vh; }
+        .filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
+        .filter-group input, .filter-group select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
+        .table-outer { border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; background: var(--card); max-height: 60vh; }
         .table-scroll { overflow-x: auto; max-height: 55vh; }
         table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 0.75rem; }
-        th {
-            position: sticky; top: 0; z-index: 20; background: var(--bg-secondary);
-            padding: 10px 6px; text-align: center; font-weight: 700; font-size: 0.65rem;
-            text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color);
-        }
-        th.sticky-col { z-index: 30; background: var(--bg-secondary); }
-        td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-weight: 500; }
-        td.sticky-col { position: sticky; z-index: 10; background: var(--bg-card); }
+        th { position: sticky; top: 0; z-index: 20; background: var(--bg2); padding: 10px 6px; text-align: center; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+        th.sticky-col { z-index: 30; background: var(--bg2); }
+        td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border); font-family: var(--mono); font-weight: 500; }
+        td.sticky-col { position: sticky; z-index: 10; background: var(--card); }
         .sticky-matricula { left: 0; width: 100px; }
-        .sticky-nome { left: 100px; width: 150px; font-family: var(--font-sans); }
-        .sticky-cargo { left: 250px; width: 130px; font-family: var(--font-sans); }
+        .sticky-nome { left: 100px; width: 150px; font-family: var(--font); }
+        .sticky-cargo { left: 250px; width: 130px; font-family: var(--font); }
         .cell-presente { color: var(--green); font-weight: 700; }
         .cell-justificativa { color: var(--orange); font-weight: 600; }
         .cell-falta { color: var(--red); font-weight: 700; }
         .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-top: 24px; }
-        .chart-box { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 16px; }
-        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--accent-blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
-        .btn.ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
-        .sync-log { background: var(--bg-secondary); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.75rem; white-space: pre-wrap; margin-top: 12px; }
-        .modal-overlay {
-            position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.5);
-            display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s;
+        .chart-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
+        .btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+        .sync-log { background: var(--bg2); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: var(--mono); font-size: 0.75rem; margin-top: 12px; }
+        /* ========== TEMA PRODUTIVIDADE (ESCURO) ========== */
+        #view-produtividade {
+            --bg-prod: #06060d;
+            --card-prod: #111127;
+            --border-prod: #1e1e3a;
+            --text-prod: #e8e8f2;
+            --muted-prod: #7a7a9e;
+            --gold: #c9a050;
+            background: var(--bg-prod);
+            color: var(--text-prod);
+            min-height: 100vh;
+            padding: 24px;
+            border-radius: 20px;
+            font-family: var(--font);
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .modal {
-            background: var(--bg-card); border-radius: 14px; padding: 24px;
-            width: 400px; max-width: 90%; box-shadow: var(--shadow-md);
-        }
-        .modal h3 { margin-bottom: 16px; }
-        .modal .form-group { margin-bottom: 12px; }
-        .modal label { font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; }
-        .modal input, .modal select { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-        @media (max-width: 768px) { .sidebar { width: 220px; --sidebar-width: 220px; } .main-content { padding: 20px 12px; } }
+        #view-produtividade .kpi-card { background: var(--card-prod); border-color: var(--border-prod); box-shadow: 0 4px 32px rgba(0,0,0,0.5); }
+        #view-produtividade .kpi-icon { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+        #view-produtividade .kpi-icon.boxes { background: rgba(91,141,239,0.15); color: #5b8def; }
+        #view-produtividade .kpi-icon.visits { background: rgba(58,184,176,0.15); color: #3ab8b0; }
+        #view-produtividade .kpi-icon.ratio { background: rgba(201,160,80,0.15); color: #c9a050; }
+        #view-produtividade .kpi-icon.total-boxes { background: rgba(201,79,108,0.15); color: #c94f6c; }
+        #view-produtividade .kpi-icon.total-visits { background: rgba(212,135,58,0.15); color: #d4873a; }
+        #view-produtividade .btn-primary { background: linear-gradient(135deg, #c9a050, #b88930); color: #1a1408; }
+        #view-produtividade .table-outer { background: #0d0d1f; border-color: var(--border-prod); }
+        #view-produtividade th { background: #0a0a1e; color: #b0b0cc; }
+        #view-produtividade td { font-family: var(--mono); }
+        #view-produtividade .sticky-col { background: #101025; }
+        /* Modal genérico */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(4px); }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px; width: 90%; max-width: 480px; transform: translateY(20px); transition: transform 0.3s; }
+        .modal-overlay.active .modal { transform: translateY(0); }
+        @media (max-width: 768px) { .sidebar { width: 220px; --sw: 220px; } .main-content { padding: 20px 12px; } }
     </style>
 </head>
 <body>
+    <!-- LOGIN -->
     <div class="login-overlay" id="loginOverlay">
-        <video id="loginVideo" autoplay loop muted playsinline crossorigin="anonymous">
-            <source src="Video.mp4" type="video/mp4">
-        </video>
+        <video id="loginVideo" autoplay loop muted playsinline crossorigin="anonymous"><source src="Video.mp4" type="video/mp4"></video>
         <canvas id="matrixCanvas"></canvas>
         <div class="login-card" id="loginCard">
             <div class="login-mark">HM</div>
@@ -206,639 +171,536 @@
         </div>
     </div>
 
+    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-header"><h2>Headcount Manager</h2></div>
         <nav class="sidebar-nav">
             <div class="nav-item active" data-page="absenteismo"><i class="fa-solid fa-user-slash"></i> Absenteísmo</div>
+            <div class="nav-item" data-page="produtividade"><i class="fa-solid fa-chart-line"></i> Produtividade</div>
             <div class="nav-item" data-page="bases" id="navBases" style="display:none;"><i class="fa-solid fa-database"></i> Bases</div>
             <div class="nav-item" data-page="usuarios" id="navUsuarios" style="display:none;"><i class="fa-solid fa-users-gear"></i> Usuários</div>
         </nav>
         <div class="sidebar-footer">
             <div class="user-info" id="userInfo" style="display:none;">
                 <div class="user-avatar" id="userAvatar">--</div>
-                <div style="flex:1"><div id="userName">--</div><div id="userLevel" style="font-size:0.65rem;color:var(--text-muted);"></div></div>
-                <button class="btn-change-password" title="Alterar senha" onclick="abrirModalAlterarSenha()"><i class="fa-solid fa-key"></i></button>
+                <div style="flex:1"><div id="userName">--</div><div id="userLevel" style="font-size:0.65rem;color:var(--muted);"></div></div>
+                <button class="btn-change-password" onclick="abrirModalAlterarSenha()"><i class="fa-solid fa-key"></i></button>
                 <button class="btn-logout" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
             <div class="theme-toggle" id="themeToggle"><i class="fa-solid fa-moon"></i><span>Modo Escuro</span></div>
-            <div style="margin-top:12px;">Desenvolvido por <strong>Pablo Martins Lopes</strong></div>
+            <div>Desenvolvido por <strong>Pablo Martins Lopes</strong></div>
         </div>
     </aside>
 
-    <main class="main-content">
+    <!-- MAIN -->
+    <main class="main-content" id="mainContent">
         <!-- ABSENTEÍSMO -->
-        <div id="view-absenteismo">
-            <div class="page-header">
-                <div class="page-title"><h1>Absenteísmo</h1><p>Presença baseada em turno por centro de custo</p></div>
-                <button class="btn" onclick="recarregarDados()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
-            </div>
+        <div class="view active" id="view-absenteismo">
+            <div class="page-header"><div class="page-title"><h1>Absenteísmo</h1></div><button class="btn" onclick="recarregarDados()"><i class="fa-solid fa-rotate"></i> Atualizar</button></div>
             <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-label">Faltas</div><div class="kpi-value" id="kpiFaltasHoje" style="color:var(--red);">--</div></div>
-                <div class="kpi-card"><div class="kpi-label">Taxa de Falta</div><div class="kpi-value" id="kpiTaxaFalta">--</div></div>
-                <div class="kpi-card"><div class="kpi-label">Justificadas</div><div class="kpi-value" id="kpiJustificadas" style="color:var(--orange);">--</div></div>
-                <div class="kpi-card"><div class="kpi-label">Total Colaboradores</div><div class="kpi-value" id="kpiTotalColab">--</div></div>
+                <div class="kpi-card"><div class="kpi-label">Faltas</div><div class="kpi-value" id="kpiFaltas" style="color:var(--red);">--</div></div>
+                <div class="kpi-card"><div class="kpi-label">Taxa</div><div class="kpi-value" id="kpiTaxa">--</div></div>
+                <div class="kpi-card"><div class="kpi-label">Justificadas</div><div class="kpi-value" id="kpiJust" style="color:var(--orange);">--</div></div>
             </div>
             <div class="filter-bar">
-                <div class="filter-group"><label>De:</label><input type="date" id="dataInicio" onchange="aplicarFiltroPeriodo()"></div>
-                <div class="filter-group"><label>Até:</label><input type="date" id="dataFim" onchange="aplicarFiltroPeriodo()"></div>
-                <div class="filter-group"><label>Buscar:</label><input type="text" id="filtroBusca" placeholder="Matrícula ou Nome" oninput="aplicarFiltrosTabela()"></div>
-                <div class="filter-group"><label>Cargo:</label><select id="filtroCargo" onchange="aplicarFiltrosTabela()"><option value="">Todos</option></select></div>
+                <div class="filter-group"><label>De:</label><input type="date" id="dataInicio" onchange="aplicarFiltroAbs()"></div>
+                <div class="filter-group"><label>Até:</label><input type="date" id="dataFim" onchange="aplicarFiltroAbs()"></div>
+                <div class="filter-group"><label>Busca:</label><input type="text" id="filtroBusca" placeholder="Matrícula ou Nome" oninput="aplicarFiltroAbs()"></div>
+                <div class="filter-group"><label>Cargo:</label><select id="filtroCargo" onchange="aplicarFiltroAbs()"><option value="">Todos</option></select></div>
             </div>
-            <div class="table-outer">
-                <div class="table-scroll"><table id="tabelaAbsenteismo"><thead id="theadAbs"></thead><tbody id="tbodyAbs"></tbody></table></div>
-            </div>
+            <div class="table-outer"><div class="table-scroll"><table id="tabelaAbs"><thead id="theadAbs"></thead><tbody id="tbodyAbs"></tbody></table></div></div>
             <div class="charts-grid">
-                <div class="chart-box"><h4><i class="fa-solid fa-calendar-day"></i> Faltas por Dia</h4><canvas id="chartDiaSemana"></canvas></div>
-                <div class="chart-box"><h4><i class="fa-solid fa-briefcase"></i> Faltas por Cargo</h4><canvas id="chartCargo"></canvas></div>
-                <div class="chart-box"><h4><i class="fa-solid fa-building"></i> Faltas por Centro</h4><canvas id="chartCentroCusto"></canvas></div>
+                <div class="chart-box"><h4>Faltas por Dia</h4><canvas id="chartDia"></canvas></div>
+                <div class="chart-box"><h4>Faltas por Cargo</h4><canvas id="chartCargo"></canvas></div>
+            </div>
+        </div>
+
+        <!-- PRODUTIVIDADE -->
+        <div class="view" id="view-produtividade">
+            <div class="app-container" style="max-width:100%;">
+                <header class="app-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                    <div style="display:flex;align-items:center;gap:14px;">
+                        <div style="width:46px;height:46px;border-radius:8px;background:linear-gradient(135deg,#c9a050,#d4873a);display:flex;align-items:center;justify-content:center;color:#1a1a08;box-shadow:0 4px 20px rgba(201,160,80,0.3);"><i class="fa-solid fa-chart-line"></i></div>
+                        <div><h1 style="font-weight:800;font-size:1.55rem;color:#e8e8f2;">Produtividade</h1><span style="font-size:0.78rem;color:#7a7a9e;">Quadro Gerencial</span></div>
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button class="btn btn-primary" onclick="openModalProd()"><i class="fa-solid fa-user-plus"></i> Novo</button>
+                        <button class="btn btn-outline btn-sm" onclick="resetFiltersProd()"><i class="fa-solid fa-rotate-left"></i> Limpar</button>
+                    </div>
+                </header>
+                <div class="kpi-grid" id="kpiProd"></div>
+                <div class="filter-bar" style="background:var(--card-prod);border-color:var(--border-prod);">
+                    <div class="filter-group"><label>Nome:</label><input type="text" id="prodNome" oninput="applyFiltersProd()"></div>
+                    <div class="filter-group"><label>Cargo:</label><select id="prodCargo" onchange="applyFiltersProd()"><option value="">Todos</option></select></div>
+                    <div class="filter-group"><label>De:</label><input type="date" id="prodInicio" onchange="applyFiltersProd()"></div>
+                    <div class="filter-group"><label>Até:</label><input type="date" id="prodFim" onchange="applyFiltersProd()"></div>
+                </div>
+                <div class="table-outer" style="background:#0d0d1f;border-color:#1e1e3a;"><div class="table-scroll" style="max-height:60vh;"><table class="prod-table" id="prodTable"><thead id="prodHead"></thead><tbody id="prodBody"></tbody></table></div></div>
             </div>
         </div>
 
         <!-- BASES -->
-        <div id="view-bases" style="display:none;">
-            <div class="page-header"><div class="page-title"><h1>Atualização de Bases</h1></div></div>
-            <div class="panel" id="panelQuadro" style="display:none;"><div class="panel-head"><i class="fa-solid fa-users"></i> Quadro HC</div><div class="panel-body"><input type="file" id="quadroFileInput" accept=".csv,.xlsx,.xls"><button class="btn" onclick="processarQuadro()"><i class="fa-solid fa-upload"></i> Enviar</button><div class="sync-log" id="quadroLog"></div></div></div>
-            <div class="panel" id="panelSuricato" style="display:none;"><div class="panel-head"><i class="fa-solid fa-clock"></i> Suricato</div><div class="panel-body"><input type="file" id="suricatoFileInput" accept=".csv,.xlsx,.xls"><button class="btn" onclick="processarSuricato()"><i class="fa-solid fa-upload"></i> Enviar</button><div class="sync-log" id="suricatoLog"></div></div></div>
-            <div class="panel" id="panelJustificativas" style="display:none;"><div class="panel-head"><i class="fa-solid fa-file-pen"></i> Justificativas</div><div class="panel-body"><input type="file" id="justificativasFileInput" accept=".csv,.xlsx,.xls"><button class="btn" onclick="processarJustificativas()"><i class="fa-solid fa-upload"></i> Enviar</button><div class="sync-log" id="justificativasLog"></div></div></div>
-            <div class="restricted-msg" id="basesRestricted">🔒 Sem permissão.</div>
+        <div class="view" id="view-bases">
+            <div class="page-header"><h1>Atualização de Bases</h1></div>
+            <div class="kpi-card" id="panelQuadro" style="display:none;"><h4><i class="fa-solid fa-users"></i> Quadro HC</h4><input type="file" id="quadroFile" accept=".csv,.xlsx"><button class="btn" onclick="uploadQuadro()">Enviar</button><div class="sync-log" id="quadroLog"></div></div>
+            <div class="kpi-card" id="panelSuricato" style="display:none;"><h4><i class="fa-solid fa-clock"></i> Suricato</h4><input type="file" id="suricatoFile" accept=".csv,.xlsx"><button class="btn" onclick="uploadSuricato()">Enviar</button><div class="sync-log" id="suricatoLog"></div></div>
+            <div class="kpi-card" id="basesRestricted" style="display:none;">🔒 Sem permissão.</div>
         </div>
 
-        <!-- USUÁRIOS (somente level 1) -->
-        <div id="view-usuarios" style="display:none;">
-            <div class="page-header">
-                <div class="page-title"><h1>Gerenciar Usuários</h1></div>
-                <button class="btn" onclick="abrirModalUsuario()"><i class="fa-solid fa-plus"></i> Novo Usuário</button>
-            </div>
-            <div class="table-outer">
-                <table>
-                    <thead><tr><th>Matrícula</th><th>Nome</th><th>Nível</th><th>Ações</th></tr></thead>
-                    <tbody id="usersTable"></tbody>
-                </table>
-            </div>
+        <!-- USUÁRIOS -->
+        <div class="view" id="view-usuarios">
+            <div class="page-header"><h1>Usuários</h1><button class="btn" onclick="abrirModalUsuario()">+ Novo</button></div>
+            <table><thead><tr><th>Matrícula</th><th>Nome</th><th>Nível</th><th>Ações</th></tr></thead><tbody id="usersTable"></tbody></table>
         </div>
     </main>
 
     <!-- MODAL USUÁRIO -->
-    <div class="modal-overlay" id="modalUsuario" style="display:none;">
+    <div class="modal-overlay" id="modalUsuario">
         <div class="modal">
             <h3 id="modalUsuarioTitle">Novo Usuário</h3>
-            <div class="form-group"><label>Matrícula</label><input type="text" id="muMatricula" placeholder="Matrícula"></div>
-            <div class="form-group"><label>Nome</label><input type="text" id="muNome" placeholder="Nome completo"></div>
-            <div class="form-group"><label>Senha</label><input type="password" id="muPassword" placeholder="Senha"></div>
-            <div class="form-group"><label>Nível</label><select id="muLevel"><option value="1">1 - Total</option><option value="2">2 - RH</option><option value="3">3 - Analista</option><option value="4">4 - Visualizador</option></select></div>
-            <input type="hidden" id="muEditingMatricula">
-            <div class="modal-actions">
+            <div style="margin-bottom:10px;"><label>Matrícula</label><input id="muMatricula" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Nome</label><input id="muNome" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Senha</label><input type="password" id="muSenha" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Nível</label><select id="muLevel" style="width:100%;padding:8px;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+            <input type="hidden" id="muEdit">
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button class="btn ghost" onclick="fecharModalUsuario()">Cancelar</button>
-                <button class="btn" id="btnSalvarUsuario" onclick="salvarUsuario()">Salvar</button>
+                <button class="btn" onclick="salvarUsuario()">Salvar</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL ALTERAR SENHA -->
-    <div class="modal-overlay" id="modalAlterarSenha" style="display:none;">
+    <div class="modal-overlay" id="modalSenha">
         <div class="modal">
             <h3>Alterar Senha</h3>
-            <div class="form-group"><label>Senha atual</label><input type="password" id="altSenhaAtual"></div>
-            <div class="form-group"><label>Nova senha</label><input type="password" id="altSenhaNova"></div>
-            <div class="form-group"><label>Confirmar nova senha</label><input type="password" id="altSenhaConfirm"></div>
-            <div class="modal-actions">
-                <button class="btn ghost" onclick="document.getElementById('modalAlterarSenha').style.display='none'">Cancelar</button>
+            <div style="margin-bottom:10px;"><label>Senha atual</label><input type="password" id="senhaAtual" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Nova</label><input type="password" id="senhaNova" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Confirmar</label><input type="password" id="senhaConfirm" style="width:100%;padding:8px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="btn ghost" onclick="document.getElementById('modalSenha').classList.remove('active')">Cancelar</button>
                 <button class="btn" onclick="alterarSenha()">Alterar</button>
             </div>
         </div>
     </div>
 
     <script>
-        (function() {
-            const SUPABASE_URL = 'https://tvrfetjhqxvxorzytpci.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA';
-            const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            Chart.register(ChartDataLabels);
+        // ========== SUPABASE ==========
+        const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
+        Chart.register(ChartDataLabels);
+        let currentUser = null;
+        let dadosHC = [], dadosSuricato = [], dadosJust = [];
+        const CENTROS = ['CD ARUJA - OPERACOES I','CD ARUJA - OPERACOES II','CD ARUJA - OPERACOES III'];
+        const TURNOS = {
+            'CD ARUJA - OPERACOES I': { ini: '05:00', fim: '15:20' },
+            'CD ARUJA - OPERACOES II': { ini: '12:40', fim: '23:00' },
+            'CD ARUJA - OPERACOES III': { ini: '21:00', fim: '06:00' }
+        };
 
-            const CENTROS_VALIDOS = ['CD ARUJA - OPERACOES I','CD ARUJA - OPERACOES II','CD ARUJA - OPERACOES III'];
-            const TURNOS = {
-                'CD ARUJA - OPERACOES I': { inicio: '05:00', fim: '15:20' },
-                'CD ARUJA - OPERACOES II': { inicio: '12:40', fim: '23:00' },
-                'CD ARUJA - OPERACOES III': { inicio: '21:00', fim: '06:00' }
-            };
+        // ========== LOGIN ==========
+        async function tentarLogin() {
+            const u = document.getElementById('loginUser').value.trim();
+            const p = document.getElementById('loginPass').value;
+            if (!u || !p) return alert('Preencha campos.');
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const { data } = await sb.from('USERS').select('*').eq('Matricula', u).limit(1);
+                if (!data?.length || String(data[0].Password).trim() !== p.trim()) throw new Error('Credenciais inválidas.');
+                currentUser = { matricula: data[0].Matricula, nome: data[0].Nome || data[0].Matricula, level: Number(data[0].Level) || 4 };
+                document.getElementById('loginOverlay').classList.add('fade-out');
+                setTimeout(() => document.getElementById('loginOverlay').style.display = 'none', 500);
+                aplicarUI();
+                await carregarDados();
+                navegar('absenteismo');
+            } catch (e) { alert(e.message); }
+            finally { btn.disabled = false;
+                btn.innerHTML = 'Entrar'; }
+        }
+        window.tentarLogin = tentarLogin;
 
-            let currentUser = null;
-            let dadosHC = [], dadosSuricato = [], dadosJustificativas = [];
-            let dataInicio, dataFim;
+        function logout() {
+            currentUser = null;
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('loginOverlay').classList.remove('fade-out');
+            document.getElementById('userInfo').style.display = 'none';
+            ['navBases','navUsuarios'].forEach(id => document.getElementById(id).style.display = 'none');
+        }
+        window.logout = logout;
 
-            // ========== UTILITÁRIOS DATA ==========
-            function parseDataHora(str) {
-                if (!str) return null;
-                str = String(str).trim();
-                const brRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/;
-                const matchBr = str.match(brRegex);
-                if (matchBr) {
-                    const [_, d, m, y, hh, mm, ss] = matchBr;
-                    return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss || '00'}`);
+        function aplicarUI() {
+            if (!currentUser) return;
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('userName').textContent = currentUser.nome.split(' ')[0];
+            document.getElementById('userAvatar').textContent = currentUser.nome.substring(0,2).toUpperCase();
+            const lvl = currentUser.level;
+            document.getElementById('userLevel').textContent = lvl === 1 ? 'Total' : lvl === 2 ? 'RH' : lvl === 3 ? 'Analista' : 'Visualizador';
+            document.getElementById('navBases').style.display = lvl < 4 ? '' : 'none';
+            document.getElementById('navUsuarios').style.display = lvl === 1 ? '' : 'none';
+        }
+
+        // ========== NAVEGAÇÃO ==========
+        function navegar(page) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${page}`).classList.add('active');
+            if (page === 'absenteismo') aplicarFiltroAbs();
+            if (page === 'produtividade') initProdutividade();
+            if (page === 'usuarios') carregarUsuarios();
+            if (page === 'bases') {
+                const lvl = currentUser?.level || 4;
+                document.getElementById('panelQuadro').style.display = (lvl === 1 || lvl === 2) ? '' : 'none';
+                document.getElementById('panelSuricato').style.display = (lvl === 1 || lvl === 3) ? '' : 'none';
+                document.getElementById('basesRestricted').style.display = (lvl < 4) ? 'none' : '';
+            }
+        }
+        document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navegar(n.dataset.page)));
+
+        // ========== TEMA ==========
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const d = document.body.classList.contains('dark-mode');
+            document.getElementById('themeToggle').innerHTML = d ? '<i class="fa-solid fa-sun"></i><span>Modo Claro</span>' : '<i class="fa-solid fa-moon"></i><span>Modo Escuro</span>';
+        });
+
+        // ========== DADOS ==========
+        async function carregarDados() {
+            try {
+                const [hc, sur, jus] = await Promise.all([
+                    sb.from('HC').select('*'),
+                    sb.from('SURICATO').select('*'),
+                    sb.from('Justificativas').select('*')
+                ]);
+                dadosHC = (hc.data || []).filter(c => CENTROS.includes(c['Descrição do centro de custo'] || ''));
+                dadosSuricato = sur.data || [];
+                dadosJust = jus.data || [];
+                // Filtro por gestor para nível 3/4
+                if (currentUser && currentUser.level > 2 && currentUser.nome) {
+                    dadosHC = dadosHC.filter(c => (c['Nome do gestor'] || '').toLowerCase().includes(currentUser.nome.toLowerCase()));
                 }
-                const isoRegex = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/;
-                const matchIso = str.match(isoRegex);
-                if (matchIso) return new Date(str);
-                const d = new Date(str);
-                return isNaN(d) ? null : d;
-            }
+            } catch (e) { console.warn('Usando dados mock', e);
+                gerarMock(); }
+            initDatasAbs();
+            aplicarFiltroAbs();
+        }
+        window.recarregarDados = carregarDados;
 
-            function extrairData(dtHora) {
-                if (!dtHora) return null;
-                const str = String(dtHora).trim();
-                const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-                if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-                const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                if (isoMatch) return isoMatch[0];
-                return null;
-            }
+        function gerarMock() {
+            dadosHC = [];
+            for (let i = 0; i < 5; i++) dadosHC.push({ Matricula: `10${i}`, Nome: `Colab ${i}`, 'Descrição do cargo': i < 2 ? 'Analista' : 'Operador', 'Descrição do centro de custo': CENTROS[i % 3], 'Nome do gestor': 'Gestor X' });
+            dadosSuricato = [];
+            dadosJust = [];
+        }
 
-            function normalizarData(dataStr) {
-                if (!dataStr) return null;
-                const str = String(dataStr).trim();
-                const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-                const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                if (isoMatch) return str;
-                return null;
-            }
+        function initDatasAbs() {
+            const hoje = new Date();
+            document.getElementById('dataInicio').value = hoje.toISOString().split('T')[0];
+            document.getElementById('dataFim').value = hoje.toISOString().split('T')[0];
+        }
 
-            function estaNoTurno(centro, dataStr, dtHoraOriginal) {
-                const turno = TURNOS[centro];
-                if (!turno) return false;
-                const dataBase = new Date(dataStr + 'T00:00:00');
-                const inicio = new Date(dataStr + 'T' + turno.inicio + ':00');
-                let fim = new Date(dataStr + 'T' + turno.fim + ':00');
-                if (turno.fim === '06:00') {
-                    fim = new Date(dataBase.getTime() + 86400000 + 6*3600000);
-                }
-                const registro = parseDataHora(dtHoraOriginal);
-                return registro ? (registro >= inicio && registro <= fim) : false;
-            }
-
-            function obterStatus(matricula, dataStr) {
-                const colaborador = dadosHC.find(c => c.Matricula === matricula);
-                if (!colaborador) return 'FA';
-                const centro = colaborador['Descrição do centro de custo'];
-                if (!CENTROS_VALIDOS.includes(centro)) return 'FA';
-                const presente = dadosSuricato.some(s => s.MATRICULA === matricula && extrairData(s.DTA_HORA) === dataStr && estaNoTurno(centro, dataStr, s.DTA_HORA));
-                if (presente) return 'P';
-                const just = dadosJustificativas.find(j => j['MATRICULA COLAB'] === matricula && normalizarData(j.DATA) === dataStr);
-                return just ? (just.MOTIVO || 'Justificada') : 'FA';
-            }
-
-            // ========== MATRIX ==========
-            (function() {
-                const canvas = document.getElementById('matrixCanvas'), ctx = canvas.getContext('2d');
-                const video = document.getElementById('loginVideo'), userField = document.getElementById('loginUser');
-                const chars = 'ｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ1234567890'.split('');
-                const fontSize = 32; let columns, drops, animationId, matrixActive = false;
-                function resizeCanvas() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; columns = Math.floor(canvas.width / fontSize); drops = Array(columns).fill(1); }
-                function drawMatrix() {
-                    ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-                    ctx.font = fontSize + 'px monospace'; ctx.fillStyle = '#0F0';
-                    for (let i=0;i<drops.length;i++) { const text = chars[Math.floor(Math.random()*chars.length)]; ctx.fillText(text,i*fontSize,drops[i]*fontSize); if(drops[i]*fontSize>canvas.height&&Math.random()>0.975)drops[i]=0; drops[i]+=0.3; }
-                    animationId = requestAnimationFrame(drawMatrix);
-                }
-                function startMatrix() { if(!matrixActive)return; canvas.style.display='block'; if(video)video.style.display='none'; resizeCanvas(); animationId=requestAnimationFrame(drawMatrix); }
-                function stopMatrix() { matrixActive=false; canvas.style.display='none'; if(video)video.style.display='block'; if(animationId)cancelAnimationFrame(animationId); ctx.clearRect(0,0,canvas.width,canvas.height); }
-                userField.addEventListener('input', function(){ if(this.value.trim()==='5520967'){ matrixActive=true; startMatrix(); } else stopMatrix(); });
-                window.addEventListener('resize', ()=>{ if(matrixActive)resizeCanvas(); });
-                stopMatrix();
-                if(video) video.play().catch(()=>{ video.style.display='none'; document.getElementById('loginOverlay').style.background='linear-gradient(135deg,#051339,#0a2472)'; });
-            })();
-
-            // ========== AUTENTICAÇÃO ==========
-            async function doLogin() {
-                const userField = document.getElementById('loginUser'), passField = document.getElementById('loginPass');
-                const errBox = document.getElementById('loginError'), errText = document.getElementById('loginErrorText');
-                const matricula = userField.value.trim(), senha = passField.value;
-                errBox.classList.remove('show');
-                if(!matricula||!senha){errText.textContent='Informe matrícula e senha.';errBox.classList.add('show');return;}
-                document.getElementById('loginBtn').disabled=true; document.getElementById('loginBtnText').innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';
-                try{
-                    const {data,error}=await sb.from('USERS').select('*').eq('Matricula',matricula).limit(1);
-                    if(error)throw error;
-                    if(!data||!data.length){errText.textContent='Matrícula não encontrada.';errBox.classList.add('show');return;}
-                    const user=data[0];
-                    if(String(user.Password).trim()!==senha.trim()){errText.textContent='Senha incorreta.';errBox.classList.add('show');return;}
-                    currentUser={matricula:user.Matricula,nome:user.Nome||user.Matricula,level:Number(user.Level)||4,fullName:user.Nome};
-                    document.getElementById('loginOverlay').classList.add('fade-out');
-                    setTimeout(()=>{document.getElementById('loginOverlay').style.display='none';},500);
-                    aplicarPermissoes();
-                    await carregarDados();
-                    navegar('absenteismo');
-                }catch(e){errText.textContent='Erro: '+e.message;errBox.classList.add('show');}
-                finally{document.getElementById('loginBtn').disabled=false;document.getElementById('loginBtnText').textContent='Entrar';}
-            }
-            window.tentarLogin = doLogin;
-            document.getElementById('loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
-            document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-
-            function logout(){
-                currentUser=null; document.getElementById('loginOverlay').style.display='flex';
-                document.getElementById('loginOverlay').classList.remove('fade-out');
-                document.getElementById('userInfo').style.display='none';
-                document.getElementById('navBases').style.display='none';
-                document.getElementById('navUsuarios').style.display='none';
-            }
-            window.logout = logout;
-
-            function aplicarPermissoes(){
-                if(!currentUser)return;
-                document.getElementById('userInfo').style.display='flex';
-                document.getElementById('userName').textContent=currentUser.nome.split(' ')[0];
-                document.getElementById('userAvatar').textContent=currentUser.nome.substring(0,2).toUpperCase();
-                document.getElementById('userLevel').textContent=currentUser.level===1?'Total':(currentUser.level===2?'RH':(currentUser.level===3?'Analista':'Visualizador'));
-                document.getElementById('navBases').style.display=currentUser.level<4?'':'none';
-                document.getElementById('navUsuarios').style.display=currentUser.level===1?'':'none';
-                prepararViewBases();
-            }
-
-            // ========== NAVEGAÇÃO ==========
-            function navegar(pagina){
-                document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
-                const nav = document.querySelector(`.nav-item[data-page="${pagina}"]`);
-                if(nav) nav.classList.add('active');
-                document.getElementById('view-absenteismo').style.display=pagina==='absenteismo'?'':'none';
-                document.getElementById('view-bases').style.display=pagina==='bases'?'':'none';
-                document.getElementById('view-usuarios').style.display=pagina==='usuarios'?'':'none';
-                if(pagina==='bases')prepararViewBases();
-                if(pagina==='absenteismo'&&dadosHC.length) aplicarFiltroPeriodo();
-                if(pagina==='usuarios')carregarUsuarios();
-            }
-            document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>navegar(i.dataset.page)));
-
-            function prepararViewBases(){
-                const lvl=currentUser?currentUser.level:4;
-                document.getElementById('panelQuadro').style.display=(lvl===1||lvl===2)?'':'none';
-                document.getElementById('panelSuricato').style.display=(lvl===1||lvl===3)?'':'none';
-                document.getElementById('panelJustificativas').style.display=(lvl===1||lvl===2)?'':'none';
-                document.getElementById('basesRestricted').style.display=(lvl<4)?'none':'';
-            }
-
-            // Tema
-            const themeToggle=document.getElementById('themeToggle');
-            themeToggle.addEventListener('click',()=>{
-                document.body.classList.toggle('dark-mode');
-                const isDark=document.body.classList.contains('dark-mode');
-                themeToggle.querySelector('i').className=isDark?'fa-solid fa-sun':'fa-solid fa-moon';
-                themeToggle.querySelector('span').textContent=isDark?'Modo Claro':'Modo Escuro';
+        // ========== ABSENTEÍSMO ==========
+        function aplicarFiltroAbs() {
+            const ini = document.getElementById('dataInicio').value;
+            const fim = document.getElementById('dataFim').value;
+            if (!ini || !fim) return;
+            const dias = gerarDias(ini, fim);
+            const busca = document.getElementById('filtroBusca').value.toLowerCase();
+            const cargoF = document.getElementById('filtroCargo').value;
+            let lista = dadosHC.filter(c => {
+                if (busca && !c.Matricula.toLowerCase().includes(busca) && !c.Nome.toLowerCase().includes(busca)) return false;
+                if (cargoF && c['Descrição do cargo'] !== cargoF) return false;
+                return true;
+            }).sort((a, b) => a.Nome.localeCompare(b.Nome, 'pt-BR'));
+            // Cabeçalho
+            let th = '<tr><th class="sticky-col sticky-matricula">Mat</th><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
+            dias.forEach(d => { const p = d.split('-');
+                th += `<th>${p[2]}/${p[1]}</th>`; });
+            th += '</tr>';
+            document.getElementById('theadAbs').innerHTML = th;
+            // Corpo
+            let tb = '';
+            lista.forEach(c => {
+                tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
+                dias.forEach(d => {
+                    const st = status(c.Matricula, c['Descrição do centro de custo'], d);
+                    tb += `<td class="${st === 'P' ? 'cell-presente' : st === 'FA' ? 'cell-falta' : 'cell-justificativa'}">${st}</td>`;
+                });
+                tb += '</tr>';
             });
+            document.getElementById('tbodyAbs').innerHTML = tb || `<tr><td colspan="${dias.length+3}">Nenhum dado.</td></tr>`;
+            atualizarKPIsAbs(lista, dias);
+            // Dropdown cargos
+            const cargos = [...new Set(dadosHC.map(c => c['Descrição do cargo']).filter(Boolean))].sort();
+            const sel = document.getElementById('filtroCargo');
+            sel.innerHTML = '<option value="">Todos</option>';
+            cargos.forEach(c => { const o = document.createElement('option');
+                o.value = c;
+                o.textContent = c;
+                sel.appendChild(o); });
+            if (cargoF) sel.value = cargoF;
+        }
+        window.aplicarFiltroAbs = aplicarFiltroAbs;
 
-            // ========== CARREGAR DADOS ==========
-            async function carregarDados(){
-                try{
-                    const [hcRes,suricatoRes,justRes]=await Promise.all([
-                        sb.from('HC').select('*'),
-                        sb.from('SURICATO').select('*'),
-                        sb.from('Justificativas').select('*')
-                    ]);
-                    let hcData = hcRes.data || [];
-                    hcData = hcData.filter(c=>CENTROS_VALIDOS.includes(c['Descrição do centro de custo']||''));
-                    // Filtro por gestor se level > 2 (3 ou 4)
-                    if (currentUser && currentUser.level > 2 && currentUser.level !== 1 && currentUser.level !== 2) {
-                        const nomeGestor = currentUser.fullName || currentUser.nome;
-                        if (nomeGestor) {
-                            hcData = hcData.filter(colab => {
-                                const gestor = (colab['Nome do gestor'] || '').toLowerCase();
-                                return gestor.includes(nomeGestor.toLowerCase());
-                            });
-                        }
-                    }
-                    dadosHC = hcData;
-                    dadosSuricato = suricatoRes.data || [];
-                    dadosJustificativas = justRes.data || [];
-                }catch(e){console.warn('Erro Supabase',e);gerarDadosSimulados();}
-                initDatas();
-                aplicarFiltroPeriodo();
+        function status(matricula, centro, data) {
+            if (!CENTROS.includes(centro)) return 'FA';
+            const presente = dadosSuricato.some(s => s.MATRICULA === matricula && extrairData(s.DTA_HORA) === data && estaNoTurno(centro, data, s.DTA_HORA));
+            if (presente) return 'P';
+            const just = dadosJust.find(j => j['MATRICULA COLAB'] === matricula && normalizarData(j.DATA) === data);
+            return just ? just.MOTIVO || 'J' : 'FA';
+        }
+
+        function extrairData(dt) { return dt?.substring(0, 10) || null; }
+        function normalizarData(d) { return d ? d.replace(/\//g, '-') : null; }
+        function estaNoTurno(centro, data, dtHora) {
+            const t = TURNOS[centro];
+            if (!t) return false;
+            const ini = new Date(data + 'T' + t.ini + ':00');
+            let fim = new Date(data + 'T' + t.fim + ':00');
+            if (t.fim === '06:00') fim = new Date(new Date(data).getTime() + 86400000 + 6 * 3600000);
+            const reg = new Date(dtHora);
+            return reg >= ini && reg <= fim;
+        }
+        function gerarDias(ini, fim) { const dias = []; const c = new Date(ini);
+            const f = new Date(fim); while (c <= f) { dias.push(c.toISOString().split('T')[0]);
+            c.setDate(c.getDate() + 1); } return dias; }
+
+        function atualizarKPIsAbs(lista, dias) {
+            let faltas = 0,
+                just = 0;
+            lista.forEach(c => dias.forEach(d => { const s = status(c.Matricula, c['Descrição do centro de custo'], d); if (s === 'FA') faltas++; else if (s !== 'P') just++; }));
+            document.getElementById('kpiFaltas').textContent = faltas;
+            document.getElementById('kpiTaxa').textContent = lista.length ? (faltas / (lista.length * dias.length) * 100).toFixed(1) + '%' : '0%';
+            document.getElementById('kpiJust').textContent = just;
+        }
+
+        // ========== PRODUTIVIDADE ==========
+        let prodEmployees = [];
+        let prodData = {};
+        function initProdutividade() {
+            if (prodEmployees.length === 0) {
+                const nomes = ['Antônio', 'Beatriz', 'Carlos', 'Daniele', 'Eduardo'];
+                nomes.forEach((n, i) => prodEmployees.push({ id: i + 1, nome: n, cargo: i < 2 ? 'Analista' : 'Operador', admissao: '2020-01-01' }));
+                for (let i = 0; i < 30; i++) { const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const ds = d.toISOString().split('T')[0];
+                    prodEmployees.forEach(e => prodData[`${e.id}_${ds}`] = { boxes: Math.floor(Math.random() * 300) + 40, visits: Math.floor(Math.random() *
+                            30) + 2 }); }
             }
-            window.recarregarDados=carregarDados;
+            document.getElementById('prodInicio').value = '';
+            document.getElementById('prodFim').value = '';
+            document.getElementById('prodNome').value = '';
+            document.getElementById('prodCargo').innerHTML = '<option value="">Todos</option>' + [...new Set(prodEmployees.map(e => e
+                .cargo))].map(c => `<option>${c}</option>`).join('');
+            applyFiltersProd();
+        }
 
-            function gerarDadosSimulados(){
-                const hoje=new Date();
-                dadosHC=[];
-                ['1001','1002','1003','1004','1005'].forEach((m,i)=>{
-                    dadosHC.push({
-                        Matricula:m,Nome:'Colaborador '+m,
-                        'Descrição do cargo':i<2?'Analista':'Operador',
-                        'Descrição do centro de custo':CENTROS_VALIDOS[i%3],
-                        'Nome do gestor':'Gestor Exemplo'
-                    });
+        function applyFiltersProd() {
+            const nome = document.getElementById('prodNome').value.toLowerCase();
+            const cargo = document.getElementById('prodCargo').value;
+            let ini = document.getElementById('prodInicio').value;
+            let fim = document.getElementById('prodFim').value;
+            if (!ini || !fim) { const hoje = new Date();
+                fim = hoje.toISOString().split('T')[0];
+                ini = new Date(hoje.getTime() - 6 * 86400000).toISOString().split('T')[0]; }
+            const dias = gerarDias(ini, fim);
+            let lista = prodEmployees.filter(e => (!nome || e.nome.toLowerCase().includes(nome)) && (!cargo || e.cargo === cargo));
+            // Tabela
+            let th = '<tr><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
+            dias.forEach(d => { const p = d.split('-');
+                th += `<th>${p[2]}/${p[1]}</th>`; });
+            th += '</tr>';
+            document.getElementById('prodHead').innerHTML = th;
+            let tb = '';
+            lista.forEach(e => {
+                tb += `<tr><td class="sticky-col sticky-nome">${e.nome}</td><td class="sticky-col sticky-cargo">${e.cargo}</td>`;
+                dias.forEach(d => { const v = prodData[`${e.id}_${d}`]?.boxes || 0;
+                    tb +=
+                        `<td class="${v > 200 ? 'cell-high' : v < 100 ? 'cell-low' : ''}" style="color:${v>200?'#5fe08b':v<100?'#e0886a':'#e0c278'}">${v}</td>`; });
+                tb += '</tr>';
+            });
+            document.getElementById('prodBody').innerHTML = tb || `<tr><td colspan="${dias.length+2}">Nenhum.</td></tr>`;
+            // KPIs
+            let totalBoxes = 0,
+                totalVisits = 0,
+                cells = 0;
+            lista.forEach(e => dias.forEach(d => { totalBoxes += prodData[`${e.id}_${d}`]?.boxes || 0;
+                totalVisits += prodData[`${e.id}_${d}`]?.visits || 0;
+                cells++; }));
+            const avgB = cells ? (totalBoxes / cells).toFixed(1) : 0;
+            const avgV = cells ? (totalVisits / cells).toFixed(1) : 0;
+            document.getElementById('kpiProd').innerHTML = `
+            <div class="kpi-card"><div class="kpi-icon boxes"><i class="fa-solid fa-box"></i></div><div class="kpi-label">Média Caixas</div><div class="kpi-value">${avgB}</div></div>
+            <div class="kpi-card"><div class="kpi-icon visits"><i class="fa-solid fa-eye"></i></div><div class="kpi-label">Média Visitas</div><div class="kpi-value">${avgV}</div></div>
+            <div class="kpi-card"><div class="kpi-icon ratio"><i class="fa-solid fa-percent"></i></div><div class="kpi-label">Total Caixas</div><div class="kpi-value">${totalBoxes}</div></div>
+            <div class="kpi-card"><div class="kpi-icon total-visits"><i class="fa-solid fa-route"></i></div><div class="kpi-label">Total Visitas</div><div class="kpi-value">${totalVisits}</div></div>`;
+        }
+        window.applyFiltersProd = applyFiltersProd;
+        window.resetFiltersProd = () => { document.getElementById('prodNome').value = '';
+            document.getElementById('prodCargo').value = '';
+            document.getElementById('prodInicio').value = '';
+            document.getElementById('prodFim').value = '';
+            applyFiltersProd(); };
+        window.openModalProd = () => {
+            const nome = prompt('Nome:');
+            if (!nome) return;
+            const cargo = prompt('Cargo:') || 'Operador';
+            prodEmployees.push({ id: Math.max(...prodEmployees.map(e => e.id), 0) + 1, nome, cargo, admissao: new Date()
+                    .toISOString().split('T')[0] });
+            applyFiltersProd();
+        };
+
+        // ========== USUÁRIOS ==========
+        async function carregarUsuarios() {
+            const { data } = await sb.from('USERS').select('*').order('Matricula');
+            document.getElementById('usersTable').innerHTML = (data || []).map(u => `<tr><td>${u.Matricula}</td><td>${u.Nome||''}</td><td>${u.Level}</td><td><button class="btn ghost" onclick="editarUsuario('${u.Matricula}')"><i class="fa-solid fa-pen"></i></button></td></tr>`)
+                .join('');
+        }
+        window.abrirModalUsuario = (mat = null) => {
+            document.getElementById('modalUsuario').classList.add('active');
+            document.getElementById('muMatricula').value = mat || '';
+            document.getElementById('muNome').value = '';
+            document.getElementById('muSenha').value = '';
+            document.getElementById('muLevel').value = '4';
+            document.getElementById('muEdit').value = mat || '';
+            if (mat) {
+                sb.from('USERS').select('*').eq('Matricula', mat).limit(1).then(({ data }) => {
+                    if (data?.length) {
+                        document.getElementById('muNome').value = data[0].Nome || '';
+                        document.getElementById('muLevel').value = data[0].Level;
+                        document.getElementById('muMatricula').readOnly = true;
+                    }
                 });
-                dadosSuricato=[];
-                for(let i=0;i<30;i++){
-                    const d=new Date(hoje);d.setDate(d.getDate()-i);
-                    const dia=d.toISOString().split('T')[0];
-                    dadosHC.forEach(colab=>{
-                        if(Math.random()>0.4){
-                            let hora='10:00';
-                            const centro=colab['Descrição do centro de custo'];
-                            if(centro===CENTROS_VALIDOS[0])hora='08:00';
-                            else if(centro===CENTROS_VALIDOS[1])hora='15:00';
-                            else hora='23:00';
-                            const [y,m,diaNum]=dia.split('-');
-                            dadosSuricato.push({DTA_HORA:`${diaNum}/${m}/${y} ${hora}:00`,MATRICULA:colab.Matricula});
-                        }
-                    });
-                }
-                dadosJustificativas=[];
+            } else document.getElementById('muMatricula').readOnly = false;
+        };
+        window.editarUsuario = mat => abrirModalUsuario(mat);
+        window.fecharModalUsuario = () => document.getElementById('modalUsuario').classList.remove('active');
+        window.salvarUsuario = async () => {
+            const mat = document.getElementById('muMatricula').value.trim();
+            const nome = document.getElementById('muNome').value.trim();
+            const senha = document.getElementById('muSenha').value;
+            const level = document.getElementById('muLevel').value;
+            const edit = document.getElementById('muEdit').value;
+            if (!mat || !nome) return alert('Preencha.');
+            const payload = { Matricula: mat, Nome: nome, Level: Number(level) };
+            if (senha) payload.Password = senha;
+            try {
+                if (edit) await sb.from('USERS').update(payload).eq('Matricula', edit);
+                else await sb.from('USERS').insert(payload);
+                fecharModalUsuario();
+                carregarUsuarios();
+            } catch (e) { alert(e.message); }
+        };
+
+        // ========== SENHA ==========
+        window.abrirModalAlterarSenha = () => document.getElementById('modalSenha').classList.add('active');
+        window.alterarSenha = async () => {
+            const atual = document.getElementById('senhaAtual').value;
+            const nova = document.getElementById('senhaNova').value;
+            const conf = document.getElementById('senhaConfirm').value;
+            if (!atual || !nova || nova !== conf) return alert('Verifique.');
+            try {
+                const { data } = await sb.from('USERS').select('Password').eq('Matricula', currentUser.matricula).limit(1);
+                if (!data?.length || data[0].Password !== atual) return alert('Senha atual incorreta.');
+                await sb.from('USERS').update({ Password: nova }).eq('Matricula', currentUser.matricula);
+                alert('Senha alterada.');
+                document.getElementById('modalSenha').classList.remove('active');
+            } catch (e) { alert(e.message); }
+        };
+
+        // ========== UPLOAD ==========
+        async function uploadQuadro() {
+            const file = document.getElementById('quadroFile').files[0];
+            if (!file) return;
+            const log = document.getElementById('quadroLog');
+            log.textContent = 'Processando...';
+            try {
+                const data = await lerArquivo(file);
+                const regs = data.map(obj => ({
+                    Matricula: obj.Matricula,
+                    Nome: obj.Nome,
+                    'Descrição do cargo': obj['Descrição do cargo'] || '',
+                    'Descrição do centro de custo': obj['Descrição do centro de custo'] || '',
+                    'Nome do gestor': obj['Nome do gestor'] || '',
+                })).filter(r => r.Matricula);
+                for (let i = 0; i < regs.length; i += 200) { await sb.from('HC').upsert(regs.slice(i, i + 200), { onConflict: 'Matricula' }); }
+                log.textContent = '✅ Concluído.';
+            } catch (e) { log.textContent = '❌ ' + e.message; }
+        }
+        window.uploadQuadro = uploadQuadro;
+
+        async function uploadSuricato() {
+            const file = document.getElementById('suricatoFile').files[0];
+            if (!file) return;
+            const log = document.getElementById('suricatoLog');
+            log.textContent = 'Processando...';
+            try {
+                const data = await lerArquivo(file);
+                const regs = data.map(obj => ({ DTA_HORA: obj.DTA_HORA, MATRICULA: obj.MATRICULA })).filter(r => r.DTA_HORA && r
+                    .MATRICULA);
+                for (let i = 0; i < regs.length; i += 200) { await sb.from('SURICATO').insert(regs.slice(i, i + 200)); }
+                log.textContent = '✅ Concluído.';
+            } catch (e) { log.textContent = '❌ ' + e.message; }
+        }
+        window.uploadSuricato = uploadSuricato;
+
+        async function lerArquivo(file) {
+            const nome = file.name.toLowerCase();
+            if (nome.endsWith('.csv') || nome.endsWith('.txt')) {
+                const text = await file.text();
+                const linhas = text.split(/\r?\n/).filter(l => l.trim());
+                const delim = linhas[0].includes(';') ? ';' : ',';
+                const h = linhas[0].split(delim).map(x => x.replace(/"/g, '').trim());
+                return linhas.slice(1).map(l => { const v = l.split(delim).map(x => x.replace(/"/g, '').trim()); const o = {};
+                    h.forEach((k, i) => o[k] = v[i] || ''); return o; });
+            }
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array' });
+            return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        }
+
+        // ========== MATRIX ==========
+        (function() {
+            const canvas = document.getElementById('matrixCanvas'),
+                ctx = canvas.getContext('2d');
+            const video = document.getElementById('loginVideo');
+            const chars =
+                'ｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ1234567890'.split('');
+            const fontSize = 32;
+            let cols, drops, id, active = false;
+
+            function resize() { canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                cols = Math.floor(canvas.width / fontSize);
+                drops = Array(cols).fill(1); }
+
+            function draw() {
+                ctx.fillStyle = 'rgba(0,0,0,0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = fontSize + 'px monospace';
+                ctx.fillStyle = '#0F0';
+                for (let i = 0; i < drops.length; i++) { const t = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(t, i * fontSize, drops[i] * fontSize); if (drops[i] * fontSize > canvas.height && Math.random() > 0.975)
+                        drops[i] = 0;
+                    drops[i] += 0.3; }
+                id = requestAnimationFrame(draw);
             }
 
-            function initDatas(){
-                const hoje=new Date();
-                dataInicio=hoje.toISOString().split('T')[0];
-                dataFim=dataInicio;
-                document.getElementById('dataInicio').value=dataInicio;
-                document.getElementById('dataFim').value=dataFim;
-            }
+            function start() { if (!active) return;
+                canvas.style.display = 'block'; if (video) video.style.display = 'none';
+                resize();
+                id = requestAnimationFrame(draw); }
 
-            function getDiasPeriodo(){ const dias=[]; const cur=new Date(dataInicio+'T00:00:00'); const fim=new Date(dataFim+'T00:00:00'); while(cur<=fim){dias.push(cur.toISOString().split('T')[0]);cur.setDate(cur.getDate()+1);} return dias; }
-
-            function aplicarFiltroPeriodo(){
-                dataInicio=document.getElementById('dataInicio').value;
-                dataFim=document.getElementById('dataFim').value;
-                if(!dataInicio||!dataFim)return;
-                atualizarKPIs();
-                aplicarFiltrosTabela();
-                renderizarGraficos();
-            }
-            window.aplicarFiltroPeriodo=aplicarFiltroPeriodo;
-
-            function aplicarFiltrosTabela(){
-                const busca=document.getElementById('filtroBusca').value.trim().toLowerCase();
-                const cargoFiltro=document.getElementById('filtroCargo').value;
-                let dadosFiltrados=dadosHC;
-                if(busca) dadosFiltrados=dadosFiltrados.filter(c=>c.Matricula.toLowerCase().includes(busca)||c.Nome.toLowerCase().includes(busca));
-                if(cargoFiltro) dadosFiltrados=dadosFiltrados.filter(c=>c['Descrição do cargo']===cargoFiltro);
-                dadosFiltrados.sort((a,b)=>a.Nome.localeCompare(b.Nome,'pt-BR'));
-                const dias=getDiasPeriodo();
-                let thead='<tr><th class="sticky-col sticky-matricula">Matrícula</th><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
-                dias.forEach(d=>{const p=d.split('-');thead+=`<th>${p[2]}/${p[1]}</th>`;});
-                thead+='</tr>'; document.getElementById('theadAbs').innerHTML=thead;
-                let tbody='';
-                dadosFiltrados.forEach(colab=>{
-                    tbody+=`<tr><td class="sticky-col sticky-matricula">${colab.Matricula}</td><td class="sticky-col sticky-nome">${colab.Nome}</td><td class="sticky-col sticky-cargo">${colab['Descrição do cargo']||''}</td>`;
-                    dias.forEach(d=>{
-                        const status=obterStatus(colab.Matricula,d);
-                        let cls='',txt=status;
-                        if(status==='P')cls='cell-presente';
-                        else if(status==='FA')cls='cell-falta';
-                        else cls='cell-justificativa';
-                        tbody+=`<td class="${cls}">${txt}</td>`;
-                    });
-                    tbody+='</tr>';
-                });
-                if(dadosFiltrados.length===0)tbody=`<tr><td colspan="${dias.length+3}">Nenhum colaborador encontrado.</td></tr>`;
-                document.getElementById('tbodyAbs').innerHTML=tbody;
-                const cargos=[...new Set(dadosHC.map(c=>c['Descrição do cargo']).filter(Boolean))].sort();
-                const sel=document.getElementById('filtroCargo');
-                sel.innerHTML='<option value="">Todos</option>';
-                cargos.forEach(c=>{const opt=document.createElement('option');opt.value=c;opt.textContent=c;sel.appendChild(opt);});
-                if(cargoFiltro)sel.value=cargoFiltro;
-            }
-            window.aplicarFiltrosTabela=aplicarFiltrosTabela;
-
-            function atualizarKPIs(){
-                const dias=getDiasPeriodo();
-                let totalFaltas=0,totalJust=0,totalColab=dadosHC.length;
-                dadosHC.forEach(colab=>{
-                    dias.forEach(d=>{
-                        const status=obterStatus(colab.Matricula,d);
-                        if(status==='FA')totalFaltas++;
-                        else if(status!=='P')totalJust++;
-                    });
-                });
-                document.getElementById('kpiFaltasHoje').textContent=totalFaltas;
-                document.getElementById('kpiTaxaFalta').textContent=totalColab?((totalFaltas/(totalColab*dias.length))*100).toFixed(1)+'%':'0%';
-                document.getElementById('kpiJustificadas').textContent=totalJust;
-                document.getElementById('kpiTotalColab').textContent=totalColab;
-            }
-
-            let chartInstances={};
-            function renderizarGraficos(){
-                const dias=getDiasPeriodo();
-                const diaSemanaNome=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-                const faltasPorDia={}; diaSemanaNome.forEach(d=>faltasPorDia[d]=0);
-                const faltasPorCargo={};
-                const faltasPorCentro={};
-                dadosHC.forEach(colab=>{
-                    const cargo=colab['Descrição do cargo']||'Não informado';
-                    const centro=colab['Descrição do centro de custo']||'Não informado';
-                    if(!faltasPorCargo[cargo])faltasPorCargo[cargo]=0;
-                    if(!faltasPorCentro[centro])faltasPorCentro[centro]=0;
-                    dias.forEach(d=>{
-                        if(obterStatus(colab.Matricula,d)==='FA'){
-                            const data=new Date(d+'T00:00:00');
-                            faltasPorDia[diaSemanaNome[data.getDay()]]++;
-                            faltasPorCargo[cargo]++;
-                            faltasPorCentro[centro]++;
-                        }
-                    });
-                });
-                const chartOptions={responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},datalabels:{anchor:'end',align:'top',color:'#111',font:{weight:'bold'}}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}};
-                Object.values(chartInstances).forEach(c=>c.destroy());
-                chartInstances.chartDiaSemana=new Chart(document.getElementById('chartDiaSemana'),{type:'bar',data:{labels:diaSemanaNome,datasets:[{data:diaSemanaNome.map(d=>faltasPorDia[d]),backgroundColor:'#3182ce'}]},options:chartOptions});
-                const cargos=Object.entries(faltasPorCargo).sort((a,b)=>b[1]-a[1]);
-                chartInstances.chartCargo=new Chart(document.getElementById('chartCargo'),{type:'bar',data:{labels:cargos.map(c=>c[0]),datasets:[{data:cargos.map(c=>c[1]),backgroundColor:'#dd6b20'}]},options:{...chartOptions,indexAxis:'y',plugins:{...chartOptions.plugins,datalabels:{...chartOptions.plugins.datalabels,align:'right'}}}});
-                const centros=Object.entries(faltasPorCentro).sort((a,b)=>b[1]-a[1]);
-                chartInstances.chartCentroCusto=new Chart(document.getElementById('chartCentroCusto'),{type:'bar',data:{labels:centros.map(c=>c[0]),datasets:[{data:centros.map(c=>c[1]),backgroundColor:'#319795'}]},options:{...chartOptions,indexAxis:'y',plugins:{...chartOptions.plugins,datalabels:{...chartOptions.plugins.datalabels,align:'right'}}}});
-            }
-
-            // ========== UPLOAD BASES (mantido igual) ==========
-            function log(el,msg){const e=document.getElementById(el);e.textContent+=msg+'\n';e.scrollTop=e.scrollHeight;}
-            async function lerArquivo(file){
-                const nome=file.name.toLowerCase();
-                if(nome.endsWith('.xlsx')||nome.endsWith('.xls')){
-                    const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});
-                    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-                }
-                const text=await file.text();return parseCSV(text);
-            }
-            function parseCSV(text){
-                const linhas=text.split(/\r?\n/).filter(l=>l.trim());if(!linhas.length)return[];
-                const delim=detectDelim(linhas[0]);const h=linhas[0].split(delim).map(x=>x.replace(/["']/g,'').trim());
-                const objs=[];for(let i=1;i<linhas.length;i++){const vals=linhas[i].split(delim).map(x=>x.replace(/["']/g,'').trim());const o={};h.forEach((k,idx)=>o[k]=vals[idx]||'');objs.push(o);}
-                return objs;
-            }
-            function detectDelim(line){let best=';';let max=0;[';',',','\t','|'].forEach(d=>{const n=line.split(d).length;if(n>max){max=n;best=d;}});return best;}
-            function acharCampo(obj,...nomes){for(const nome of nomes){const found=Object.keys(obj).find(k=>k.replace(/[^A-Za-z0-9]/g,'').toUpperCase()===nome.replace(/[^A-Za-z0-9]/g,'').toUpperCase());if(found)return obj[found];}return'';}
-            function parseData(str){if(!str)return null;str=String(str).trim();const iso=str.match(/^(\d{4})-(\d{2})-(\d{2})/);if(iso)return new Date(iso[0]);const br=str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);if(br)return new Date(br[3],br[2]-1,br[1]);return null;}
-            function calcularIdade(dataNasc){if(!dataNasc)return null;const hoje=new Date();const nasc=parseData(dataNasc);if(!nasc)return null;let idade=hoje.getFullYear()-nasc.getFullYear();if(hoje.getMonth()<nasc.getMonth()||(hoje.getMonth()===nasc.getMonth()&&hoje.getDate()<nasc.getDate()))idade--;return idade;}
-
-            async function processarQuadro(){
-                if(!currentUser||(currentUser.level!==1&&currentUser.level!==2)){alert('Acesso negado.');return;}
-                const file=document.getElementById('quadroFileInput').files[0];if(!file)return;
-                const logId='quadroLog',btn=document.getElementById('btnQuadro');btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';
-                try{
-                    const linhas=await lerArquivo(file);const registros=[];
-                    linhas.forEach(obj=>{
-                        const matricula=acharCampo(obj,'Matricula');if(!matricula)return;
-                        const dataNasc=acharCampo(obj,'Data de Nascimento','DataNascimento');
-                        registros.push({
-                            Matricula:matricula,Nome:acharCampo(obj,'Nome'),'Data de admissão':acharCampo(obj,'Data de admissão','DataAdmissao')||null,
-                            'Descrição do cargo':acharCampo(obj,'Descrição do cargo','DescricaoCargo')||null,
-                            'Nome do estabelecimento':acharCampo(obj,'Nome do estabelecimento','Estabelecimento')||null,
-                            'Descrição do centro de custo':acharCampo(obj,'Descrição do centro de custo','CentroCusto')||null,
-                            'Data de Nascimento':dataNasc||null,Idade:calcularIdade(dataNasc),
-                            'Nome do gestor':acharCampo(obj,'Nome do gestor','Gestor')||null,
-                            'Descrição da situação':acharCampo(obj,'Descrição da situação','Situacao')||null,
-                            'Data afastamento':acharCampo(obj,'Data afastamento','DataAfastamento')||null,
-                            'Data de retorno':acharCampo(obj,'Data de retorno','DataRetorno')||null,
-                            'Motivo do afastamento':acharCampo(obj,'Motivo do afastamento','MotivoAfastamento')||null
-                        });
-                    });
-                    for(let i=0;i<registros.length;i+=200){
-                        const batch=registros.slice(i,i+200);
-                        const {error}=await sb.from('HC').upsert(batch,{onConflict:'Matricula'});
-                        if(error)log(logId,'Erro: '+error.message);else log(logId,'Lote OK');
-                    }
-                    log(logId,'✅ Concluído');
-                }catch(e){log(logId,'❌ '+e.message);}
-                finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-upload"></i> Enviar';}
-            }
-            window.processarQuadro=processarQuadro;
-
-            async function processarSuricato(){
-                if(!currentUser||(currentUser.level!==1&&currentUser.level!==3)){alert('Acesso negado.');return;}
-                const file=document.getElementById('suricatoFileInput').files[0];if(!file)return;
-                const logId='suricatoLog',btn=document.getElementById('btnSuricato');btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';
-                try{
-                    const linhas=await lerArquivo(file);const registros=[];
-                    linhas.forEach(obj=>{
-                        const dtaHora=acharCampo(obj,'DTA_HORA','DataHora','Data');
-                        const matricula=acharCampo(obj,'MATRICULA','Matricula');
-                        if(dtaHora&&matricula)registros.push({DTA_HORA:dtaHora,MATRICULA:matricula});
-                    });
-                    for(let i=0;i<registros.length;i+=200){
-                        const batch=registros.slice(i,i+200);
-                        const {error}=await sb.from('SURICATO').insert(batch);
-                        if(error)log(logId,'Erro: '+error.message);else log(logId,'Lote inserido');
-                    }
-                    log(logId,'✅ Concluído');
-                }catch(e){log(logId,'❌ '+e.message);}
-                finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-upload"></i> Enviar';}
-            }
-            window.processarSuricato=processarSuricato;
-
-            async function processarJustificativas(){
-                if(!currentUser||(currentUser.level!==1&&currentUser.level!==2)){alert('Acesso negado.');return;}
-                const file=document.getElementById('justificativasFileInput').files[0];if(!file)return;
-                const logId='justificativasLog',btn=document.getElementById('btnJustificativas');btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';
-                try{
-                    const linhas=await lerArquivo(file);const registros=[];
-                    linhas.forEach(obj=>{
-                        const matColab=acharCampo(obj,'MATRICULA COLAB');
-                        const motivo=acharCampo(obj,'MOTIVO');const data=acharCampo(obj,'DATA');
-                        const obs=acharCampo(obj,'OBS');const matGestor=acharCampo(obj,'MATRICULA GESTOR');
-                        if(matColab&&motivo&&data)registros.push({'MATRICULA COLAB':matColab,MOTIVO:motivo,DATA:data,OBS:obs||null,'MATRICULA GESTOR':matGestor||null});
-                    });
-                    for(let i=0;i<registros.length;i+=200){
-                        const batch=registros.slice(i,i+200);
-                        const {error}=await sb.from('Justificativas').insert(batch);
-                        if(error)log(logId,'Erro: '+error.message);else log(logId,'Lote inserido');
-                    }
-                    log(logId,'✅ Concluído');
-                }catch(e){log(logId,'❌ '+e.message);}
-                finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-upload"></i> Enviar';}
-            }
-            window.processarJustificativas=processarJustificativas;
-
-            // ========== GERENCIAR USUÁRIOS (LEVEL 1) ==========
-            async function carregarUsuarios(){
-                if(!currentUser||currentUser.level!==1)return;
-                try{
-                    const {data,error}=await sb.from('USERS').select('*').order('Matricula');
-                    if(error)throw error;
-                    const tbody=document.getElementById('usersTable');
-                    tbody.innerHTML=data.map(u=>`<tr>
-                        <td>${u.Matricula}</td><td>${u.Nome||''}</td>
-                        <td>${u.Level}</td>
-                        <td><button class="btn ghost" onclick="editarUsuario('${u.Matricula}')"><i class="fa-solid fa-pen"></i></button></td>
-                    </tr>`).join('');
-                }catch(e){alert('Erro ao carregar usuários: '+e.message);}
-            }
-
-            function abrirModalUsuario(matricula=null){
-                document.getElementById('modalUsuario').style.display='flex';
-                document.getElementById('muMatricula').value=matricula||'';
-                document.getElementById('muNome').value='';
-                document.getElementById('muPassword').value='';
-                document.getElementById('muLevel').value='4';
-                document.getElementById('muEditingMatricula').value=matricula||'';
-                document.getElementById('modalUsuarioTitle').textContent=matricula?'Editar Usuário':'Novo Usuário';
-                if(matricula){
-                    sb.from('USERS').select('*').eq('Matricula',matricula).limit(1).then(({data})=>{
-                        if(data&&data.length){
-                            document.getElementById('muNome').value=data[0].Nome||'';
-                            document.getElementById('muLevel').value=data[0].Level;
-                            document.getElementById('muMatricula').readOnly=true;
-                        }
-                    });
-                }else{
-                    document.getElementById('muMatricula').readOnly=false;
-                }
-            }
-            window.abrirModalUsuario = () => abrirModalUsuario(null);
-            window.editarUsuario = (mat) => abrirModalUsuario(mat);
-
-            function fecharModalUsuario(){ document.getElementById('modalUsuario').style.display='none'; }
-            window.fecharModalUsuario = fecharModalUsuario;
-
-            async function salvarUsuario(){
-                const matricula = document.getElementById('muMatricula').value.trim();
-                const nome = document.getElementById('muNome').value.trim();
-                const password = document.getElementById('muPassword').value;
-                const level = document.getElementById('muLevel').value;
-                const editing = document.getElementById('muEditingMatricula').value;
-                if(!matricula||!nome){alert('Matrícula e Nome são obrigatórios.');return;}
-                if(!editing && !password){alert('Senha é obrigatória para novo usuário.');return;}
-                const payload = {Matricula:matricula, Nome:nome, Level:Number(level)};
-                if(password) payload.Password = password;
-                const btn = document.getElementById('btnSalvarUsuario');
-                btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
-                try{
-                    if(editing){
-                        const {error} = await sb.from('USERS').update(payload).eq('Matricula',editing);
-                        if(error)throw error;
-                    }else{
-                        const {error} = await sb.from('USERS').insert(payload);
-                        if(error)throw error;
-                    }
-                    fecharModalUsuario();
-                    carregarUsuarios();
-                }catch(e){alert('Erro: '+e.message);}
-                finally{btn.disabled=false;btn.textContent='Salvar';}
-            }
-            window.salvarUsuario = salvarUsuario;
-
-            // ========== ALTERAR SENHA ==========
-            function abrirModalAlterarSenha(){
-                document.getElementById('altSenhaAtual').value='';
-                document.getElementById('altSenhaNova').value='';
-                document.getElementById('altSenhaConfirm').value='';
-                document.getElementById('modalAlterarSenha').style.display='flex';
-            }
-            window.abrirModalAlterarSenha = abrirModalAlterarSenha;
-
-            async function alterarSenha(){
-                const atual = document.getElementById('altSenhaAtual').value;
-                const nova = document.getElementById('altSenhaNova').value;
-                const confirm = document.getElementById('altSenhaConfirm').value;
-                if(!atual||!nova||!confirm){alert('Preencha todos os campos.');return;}
-                if(nova!==confirm){alert('Nova senha e confirmação não coincidem.');return;}
-                if(!currentUser)return;
-                try{
-                    const {data,error} = await sb.from('USERS').select('Password').eq('Matricula',currentUser.matricula).limit(1);
-                    if(error)throw error;
-                    if(!data||data.length===0||String(data[0].Password).trim()!==atual.trim()){alert('Senha atual incorreta.');return;}
-                    const {error:updateErr} = await sb.from('USERS').update({Password:nova}).eq('Matricula',currentUser.matricula);
-                    if(updateErr)throw updateErr;
-                    alert('Senha alterada com sucesso.');
-                    document.getElementById('modalAlterarSenha').style.display='none';
-                }catch(e){alert('Erro: '+e.message);}
-            }
-            window.alterarSenha = alterarSenha;
+            function stop() { active = false;
+                canvas.style.display = 'none'; if (video) video.style.display = 'block'; if (id) cancelAnimationFrame(id);
+                ctx.clearRect(0, 0, canvas.width, canvas.height); }
+            document.getElementById('loginUser').addEventListener('input', function() { if (this.value === '5520967') { active =
+                    true;
+                    start(); } else stop(); });
+            window.addEventListener('resize', () => { if (active) resize(); });
+            stop();
+            if (video) video.play().catch(() => {});
         })();
     </script>
 </body>
