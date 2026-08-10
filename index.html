@@ -12,7 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
-        /* ... (mantenha todo o CSS fornecido anteriormente) ... */
         :root {
             --bg-primary: #ffffff;
             --bg-secondary: #f5f7fc;
@@ -133,6 +132,8 @@
         .theme-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; color: var(--text-secondary); font-size: 0.82rem; padding: 8px 0; }
         .btn-logout { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 0.7rem; color: var(--text-muted); }
         .btn-logout:hover { border-color: var(--accent-blue); }
+        .btn-change-password { background: none; border: none; cursor: pointer; color: var(--text-muted); margin-left: auto; font-size: 0.8rem; }
+        .btn-change-password:hover { color: var(--accent-blue); }
         /* MAIN */
         .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 28px 32px 40px; width: calc(100% - var(--sidebar-width)); }
         .page-header { display: flex; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
@@ -149,14 +150,20 @@
             padding: 8px 12px; border-radius: 8px; font-family: var(--font-mono);
             color: var(--text-primary); font-size: 0.82rem; outline: none;
         }
-        .table-outer { border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden; background: var(--bg-card); }
+        .table-outer { border: 1px solid var(--border-color); border-radius: var(--radius); overflow: auto; background: var(--bg-card); max-height: 60vh; }
         .table-scroll { overflow-x: auto; max-height: 55vh; }
         table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 0.75rem; }
-        th { position: sticky; top: 0; z-index: 20; background: var(--bg-secondary); padding: 10px 6px; text-align: center; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+        th {
+            position: sticky; top: 0; z-index: 20; background: var(--bg-secondary);
+            padding: 10px 6px; text-align: center; font-weight: 700; font-size: 0.65rem;
+            text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color);
+        }
+        th.sticky-col { z-index: 30; background: var(--bg-secondary); }
         td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-weight: 500; }
-        .sticky-matricula { position: sticky; left: 0; z-index: 10; width: 100px; background: var(--bg-card); }
-        .sticky-nome { position: sticky; left: 100px; z-index: 10; width: 150px; background: var(--bg-card); font-family: var(--font-sans); }
-        .sticky-cargo { position: sticky; left: 250px; z-index: 10; width: 130px; background: var(--bg-card); font-family: var(--font-sans); }
+        td.sticky-col { position: sticky; z-index: 10; background: var(--bg-card); }
+        .sticky-matricula { left: 0; width: 100px; }
+        .sticky-nome { left: 100px; width: 150px; font-family: var(--font-sans); }
+        .sticky-cargo { left: 250px; width: 130px; font-family: var(--font-sans); }
         .cell-presente { color: var(--green); font-weight: 700; }
         .cell-justificativa { color: var(--orange); font-weight: 600; }
         .cell-falta { color: var(--red); font-weight: 700; }
@@ -165,6 +172,20 @@
         .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--accent-blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
         .btn.ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
         .sync-log { background: var(--bg-secondary); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.75rem; white-space: pre-wrap; margin-top: 12px; }
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal {
+            background: var(--bg-card); border-radius: 14px; padding: 24px;
+            width: 400px; max-width: 90%; box-shadow: var(--shadow-md);
+        }
+        .modal h3 { margin-bottom: 16px; }
+        .modal .form-group { margin-bottom: 12px; }
+        .modal label { font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; }
+        .modal input, .modal select { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
         @media (max-width: 768px) { .sidebar { width: 220px; --sidebar-width: 220px; } .main-content { padding: 20px 12px; } }
     </style>
 </head>
@@ -190,11 +211,13 @@
         <nav class="sidebar-nav">
             <div class="nav-item active" data-page="absenteismo"><i class="fa-solid fa-user-slash"></i> Absenteísmo</div>
             <div class="nav-item" data-page="bases" id="navBases" style="display:none;"><i class="fa-solid fa-database"></i> Bases</div>
+            <div class="nav-item" data-page="usuarios" id="navUsuarios" style="display:none;"><i class="fa-solid fa-users-gear"></i> Usuários</div>
         </nav>
         <div class="sidebar-footer">
             <div class="user-info" id="userInfo" style="display:none;">
                 <div class="user-avatar" id="userAvatar">--</div>
                 <div style="flex:1"><div id="userName">--</div><div id="userLevel" style="font-size:0.65rem;color:var(--text-muted);"></div></div>
+                <button class="btn-change-password" title="Alterar senha" onclick="abrirModalAlterarSenha()"><i class="fa-solid fa-key"></i></button>
                 <button class="btn-logout" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
             <div class="theme-toggle" id="themeToggle"><i class="fa-solid fa-moon"></i><span>Modo Escuro</span></div>
@@ -203,13 +226,14 @@
     </aside>
 
     <main class="main-content">
+        <!-- ABSENTEÍSMO -->
         <div id="view-absenteismo">
             <div class="page-header">
                 <div class="page-title"><h1>Absenteísmo</h1><p>Presença baseada em turno por centro de custo</p></div>
                 <button class="btn" onclick="recarregarDados()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
             </div>
             <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-label">Faltas Hoje</div><div class="kpi-value" id="kpiFaltasHoje" style="color:var(--red);">--</div></div>
+                <div class="kpi-card"><div class="kpi-label">Faltas</div><div class="kpi-value" id="kpiFaltasHoje" style="color:var(--red);">--</div></div>
                 <div class="kpi-card"><div class="kpi-label">Taxa de Falta</div><div class="kpi-value" id="kpiTaxaFalta">--</div></div>
                 <div class="kpi-card"><div class="kpi-label">Justificadas</div><div class="kpi-value" id="kpiJustificadas" style="color:var(--orange);">--</div></div>
                 <div class="kpi-card"><div class="kpi-label">Total Colaboradores</div><div class="kpi-value" id="kpiTotalColab">--</div></div>
@@ -229,6 +253,8 @@
                 <div class="chart-box"><h4><i class="fa-solid fa-building"></i> Faltas por Centro</h4><canvas id="chartCentroCusto"></canvas></div>
             </div>
         </div>
+
+        <!-- BASES -->
         <div id="view-bases" style="display:none;">
             <div class="page-header"><div class="page-title"><h1>Atualização de Bases</h1></div></div>
             <div class="panel" id="panelQuadro" style="display:none;"><div class="panel-head"><i class="fa-solid fa-users"></i> Quadro HC</div><div class="panel-body"><input type="file" id="quadroFileInput" accept=".csv,.xlsx,.xls"><button class="btn" onclick="processarQuadro()"><i class="fa-solid fa-upload"></i> Enviar</button><div class="sync-log" id="quadroLog"></div></div></div>
@@ -236,7 +262,51 @@
             <div class="panel" id="panelJustificativas" style="display:none;"><div class="panel-head"><i class="fa-solid fa-file-pen"></i> Justificativas</div><div class="panel-body"><input type="file" id="justificativasFileInput" accept=".csv,.xlsx,.xls"><button class="btn" onclick="processarJustificativas()"><i class="fa-solid fa-upload"></i> Enviar</button><div class="sync-log" id="justificativasLog"></div></div></div>
             <div class="restricted-msg" id="basesRestricted">🔒 Sem permissão.</div>
         </div>
+
+        <!-- USUÁRIOS (somente level 1) -->
+        <div id="view-usuarios" style="display:none;">
+            <div class="page-header">
+                <div class="page-title"><h1>Gerenciar Usuários</h1></div>
+                <button class="btn" onclick="abrirModalUsuario()"><i class="fa-solid fa-plus"></i> Novo Usuário</button>
+            </div>
+            <div class="table-outer">
+                <table>
+                    <thead><tr><th>Matrícula</th><th>Nome</th><th>Nível</th><th>Ações</th></tr></thead>
+                    <tbody id="usersTable"></tbody>
+                </table>
+            </div>
+        </div>
     </main>
+
+    <!-- MODAL USUÁRIO -->
+    <div class="modal-overlay" id="modalUsuario" style="display:none;">
+        <div class="modal">
+            <h3 id="modalUsuarioTitle">Novo Usuário</h3>
+            <div class="form-group"><label>Matrícula</label><input type="text" id="muMatricula" placeholder="Matrícula"></div>
+            <div class="form-group"><label>Nome</label><input type="text" id="muNome" placeholder="Nome completo"></div>
+            <div class="form-group"><label>Senha</label><input type="password" id="muPassword" placeholder="Senha"></div>
+            <div class="form-group"><label>Nível</label><select id="muLevel"><option value="1">1 - Total</option><option value="2">2 - RH</option><option value="3">3 - Analista</option><option value="4">4 - Visualizador</option></select></div>
+            <input type="hidden" id="muEditingMatricula">
+            <div class="modal-actions">
+                <button class="btn ghost" onclick="fecharModalUsuario()">Cancelar</button>
+                <button class="btn" id="btnSalvarUsuario" onclick="salvarUsuario()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ALTERAR SENHA -->
+    <div class="modal-overlay" id="modalAlterarSenha" style="display:none;">
+        <div class="modal">
+            <h3>Alterar Senha</h3>
+            <div class="form-group"><label>Senha atual</label><input type="password" id="altSenhaAtual"></div>
+            <div class="form-group"><label>Nova senha</label><input type="password" id="altSenhaNova"></div>
+            <div class="form-group"><label>Confirmar nova senha</label><input type="password" id="altSenhaConfirm"></div>
+            <div class="modal-actions">
+                <button class="btn ghost" onclick="document.getElementById('modalAlterarSenha').style.display='none'">Cancelar</button>
+                <button class="btn" onclick="alterarSenha()">Alterar</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         (function() {
@@ -245,7 +315,6 @@
             const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             Chart.register(ChartDataLabels);
 
-            // Centros válidos e turnos
             const CENTROS_VALIDOS = ['CD ARUJA - OPERACOES I','CD ARUJA - OPERACOES II','CD ARUJA - OPERACOES III'];
             const TURNOS = {
                 'CD ARUJA - OPERACOES I': { inicio: '05:00', fim: '15:20' },
@@ -257,24 +326,19 @@
             let dadosHC = [], dadosSuricato = [], dadosJustificativas = [];
             let dataInicio, dataFim;
 
-            // ========== FUNÇÕES DE PARSE DE DATA/HORA ==========
+            // ========== UTILITÁRIOS DATA ==========
             function parseDataHora(str) {
                 if (!str) return null;
                 str = String(str).trim();
-                // Formato DD/MM/YYYY HH:MM:SS (ex: 05/04/2026 21:43:00)
                 const brRegex = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/;
                 const matchBr = str.match(brRegex);
                 if (matchBr) {
                     const [_, d, m, y, hh, mm, ss] = matchBr;
                     return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss || '00'}`);
                 }
-                // Formato ISO
                 const isoRegex = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/;
                 const matchIso = str.match(isoRegex);
-                if (matchIso) {
-                    return new Date(str);
-                }
-                // Fallback
+                if (matchIso) return new Date(str);
                 const d = new Date(str);
                 return isNaN(d) ? null : d;
             }
@@ -282,32 +346,23 @@
             function extrairData(dtHora) {
                 if (!dtHora) return null;
                 const str = String(dtHora).trim();
-                // Se for DD/MM/YYYY HH:MM:SS
                 const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-                if (brMatch) {
-                    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`; // YYYY-MM-DD
-                }
-                // Se for ISO
+                if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
                 const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                if (isoMatch) {
-                    return isoMatch[0];
-                }
+                if (isoMatch) return isoMatch[0];
                 return null;
             }
 
             function normalizarData(dataStr) {
                 if (!dataStr) return null;
                 const str = String(dataStr).trim();
-                // DD/MM/YYYY
                 const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
                 if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-                // YYYY-MM-DD
                 const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
                 if (isoMatch) return str;
                 return null;
             }
 
-            // ========== LÓGICA DE TURNO ==========
             function estaNoTurno(centro, dataStr, dtHoraOriginal) {
                 const turno = TURNOS[centro];
                 if (!turno) return false;
@@ -315,12 +370,10 @@
                 const inicio = new Date(dataStr + 'T' + turno.inicio + ':00');
                 let fim = new Date(dataStr + 'T' + turno.fim + ':00');
                 if (turno.fim === '06:00') {
-                    // Turno da noite atravessa meia-noite
-                    fim = new Date(dataBase.getTime() + 86400000 + 6*3600000); // próximo dia 06:00
+                    fim = new Date(dataBase.getTime() + 86400000 + 6*3600000);
                 }
                 const registro = parseDataHora(dtHoraOriginal);
-                if (!registro) return false;
-                return registro >= inicio && registro <= fim;
+                return registro ? (registro >= inicio && registro <= fim) : false;
             }
 
             function obterStatus(matricula, dataStr) {
@@ -328,24 +381,13 @@
                 if (!colaborador) return 'FA';
                 const centro = colaborador['Descrição do centro de custo'];
                 if (!CENTROS_VALIDOS.includes(centro)) return 'FA';
-                // Verifica presença no SURICATO dentro do turno
-                const presente = dadosSuricato.some(s => {
-                    if (s.MATRICULA !== matricula) return false;
-                    const dataRegistro = extrairData(s.DTA_HORA);
-                    if (dataRegistro !== dataStr) return false;
-                    return estaNoTurno(centro, dataStr, s.DTA_HORA);
-                });
+                const presente = dadosSuricato.some(s => s.MATRICULA === matricula && extrairData(s.DTA_HORA) === dataStr && estaNoTurno(centro, dataStr, s.DTA_HORA));
                 if (presente) return 'P';
-                // Verifica justificativa
-                const just = dadosJustificativas.find(j => {
-                    const matColab = j['MATRICULA COLAB'];
-                    const dataJust = normalizarData(j.DATA);
-                    return matColab === matricula && dataJust === dataStr;
-                });
+                const just = dadosJustificativas.find(j => j['MATRICULA COLAB'] === matricula && normalizarData(j.DATA) === dataStr);
                 return just ? (just.MOTIVO || 'Justificada') : 'FA';
             }
 
-            // ========== EFEITO MATRIX ==========
+            // ========== MATRIX ==========
             (function() {
                 const canvas = document.getElementById('matrixCanvas'), ctx = canvas.getContext('2d');
                 const video = document.getElementById('loginVideo'), userField = document.getElementById('loginUser');
@@ -366,7 +408,7 @@
                 if(video) video.play().catch(()=>{ video.style.display='none'; document.getElementById('loginOverlay').style.background='linear-gradient(135deg,#051339,#0a2472)'; });
             })();
 
-            // Autenticação
+            // ========== AUTENTICAÇÃO ==========
             async function doLogin() {
                 const userField = document.getElementById('loginUser'), passField = document.getElementById('loginPass');
                 const errBox = document.getElementById('loginError'), errText = document.getElementById('loginErrorText');
@@ -380,7 +422,7 @@
                     if(!data||!data.length){errText.textContent='Matrícula não encontrada.';errBox.classList.add('show');return;}
                     const user=data[0];
                     if(String(user.Password).trim()!==senha.trim()){errText.textContent='Senha incorreta.';errBox.classList.add('show');return;}
-                    currentUser={matricula:user.Matricula,nome:user.Nome||user.Matricula,level:Number(user.Level)||4};
+                    currentUser={matricula:user.Matricula,nome:user.Nome||user.Matricula,level:Number(user.Level)||4,fullName:user.Nome};
                     document.getElementById('loginOverlay').classList.add('fade-out');
                     setTimeout(()=>{document.getElementById('loginOverlay').style.display='none';},500);
                     aplicarPermissoes();
@@ -392,7 +434,14 @@
             window.tentarLogin = doLogin;
             document.getElementById('loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
             document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-            function logout(){currentUser=null;document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginOverlay').classList.remove('fade-out');document.getElementById('userInfo').style.display='none';document.getElementById('navBases').style.display='none';}
+
+            function logout(){
+                currentUser=null; document.getElementById('loginOverlay').style.display='flex';
+                document.getElementById('loginOverlay').classList.remove('fade-out');
+                document.getElementById('userInfo').style.display='none';
+                document.getElementById('navBases').style.display='none';
+                document.getElementById('navUsuarios').style.display='none';
+            }
             window.logout = logout;
 
             function aplicarPermissoes(){
@@ -402,16 +451,21 @@
                 document.getElementById('userAvatar').textContent=currentUser.nome.substring(0,2).toUpperCase();
                 document.getElementById('userLevel').textContent=currentUser.level===1?'Total':(currentUser.level===2?'RH':(currentUser.level===3?'Analista':'Visualizador'));
                 document.getElementById('navBases').style.display=currentUser.level<4?'':'none';
+                document.getElementById('navUsuarios').style.display=currentUser.level===1?'':'none';
                 prepararViewBases();
             }
 
+            // ========== NAVEGAÇÃO ==========
             function navegar(pagina){
                 document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
-                document.querySelector(`.nav-item[data-page="${pagina}"]`).classList.add('active');
+                const nav = document.querySelector(`.nav-item[data-page="${pagina}"]`);
+                if(nav) nav.classList.add('active');
                 document.getElementById('view-absenteismo').style.display=pagina==='absenteismo'?'':'none';
                 document.getElementById('view-bases').style.display=pagina==='bases'?'':'none';
+                document.getElementById('view-usuarios').style.display=pagina==='usuarios'?'':'none';
                 if(pagina==='bases')prepararViewBases();
                 if(pagina==='absenteismo'&&dadosHC.length) aplicarFiltroPeriodo();
+                if(pagina==='usuarios')carregarUsuarios();
             }
             document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>navegar(i.dataset.page)));
 
@@ -432,7 +486,7 @@
                 themeToggle.querySelector('span').textContent=isDark?'Modo Claro':'Modo Escuro';
             });
 
-            // Carregar dados
+            // ========== CARREGAR DADOS ==========
             async function carregarDados(){
                 try{
                     const [hcRes,suricatoRes,justRes]=await Promise.all([
@@ -440,10 +494,22 @@
                         sb.from('SURICATO').select('*'),
                         sb.from('Justificativas').select('*')
                     ]);
-                    dadosHC=(hcRes.data||[]).filter(c=>CENTROS_VALIDOS.includes(c['Descrição do centro de custo']||''));
-                    dadosSuricato=suricatoRes.data||[];
-                    dadosJustificativas=justRes.data||[];
-                }catch(e){console.warn('Erro Supabase, simulando dados',e);gerarDadosSimulados();}
+                    let hcData = hcRes.data || [];
+                    hcData = hcData.filter(c=>CENTROS_VALIDOS.includes(c['Descrição do centro de custo']||''));
+                    // Filtro por gestor se level > 2 (3 ou 4)
+                    if (currentUser && currentUser.level > 2 && currentUser.level !== 1 && currentUser.level !== 2) {
+                        const nomeGestor = currentUser.fullName || currentUser.nome;
+                        if (nomeGestor) {
+                            hcData = hcData.filter(colab => {
+                                const gestor = (colab['Nome do gestor'] || '').toLowerCase();
+                                return gestor.includes(nomeGestor.toLowerCase());
+                            });
+                        }
+                    }
+                    dadosHC = hcData;
+                    dadosSuricato = suricatoRes.data || [];
+                    dadosJustificativas = justRes.data || [];
+                }catch(e){console.warn('Erro Supabase',e);gerarDadosSimulados();}
                 initDatas();
                 aplicarFiltroPeriodo();
             }
@@ -454,10 +520,10 @@
                 dadosHC=[];
                 ['1001','1002','1003','1004','1005'].forEach((m,i)=>{
                     dadosHC.push({
-                        Matricula:m,
-                        Nome:'Colaborador '+m,
+                        Matricula:m,Nome:'Colaborador '+m,
                         'Descrição do cargo':i<2?'Analista':'Operador',
-                        'Descrição do centro de custo':CENTROS_VALIDOS[i%3]
+                        'Descrição do centro de custo':CENTROS_VALIDOS[i%3],
+                        'Nome do gestor':'Gestor Exemplo'
                     });
                 });
                 dadosSuricato=[];
@@ -471,7 +537,6 @@
                             if(centro===CENTROS_VALIDOS[0])hora='08:00';
                             else if(centro===CENTROS_VALIDOS[1])hora='15:00';
                             else hora='23:00';
-                            // Formato brasileiro simulado
                             const [y,m,diaNum]=dia.split('-');
                             dadosSuricato.push({DTA_HORA:`${diaNum}/${m}/${y} ${hora}:00`,MATRICULA:colab.Matricula});
                         }
@@ -508,14 +573,12 @@
                 if(cargoFiltro) dadosFiltrados=dadosFiltrados.filter(c=>c['Descrição do cargo']===cargoFiltro);
                 dadosFiltrados.sort((a,b)=>a.Nome.localeCompare(b.Nome,'pt-BR'));
                 const dias=getDiasPeriodo();
-                // Cabeçalho
-                let thead='<tr><th class="sticky-matricula">Matrícula</th><th class="sticky-nome">Nome</th><th class="sticky-cargo">Cargo</th>';
+                let thead='<tr><th class="sticky-col sticky-matricula">Matrícula</th><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
                 dias.forEach(d=>{const p=d.split('-');thead+=`<th>${p[2]}/${p[1]}</th>`;});
                 thead+='</tr>'; document.getElementById('theadAbs').innerHTML=thead;
-                // Corpo
                 let tbody='';
                 dadosFiltrados.forEach(colab=>{
-                    tbody+=`<tr><td class="sticky-matricula">${colab.Matricula}</td><td class="sticky-nome">${colab.Nome}</td><td class="sticky-cargo">${colab['Descrição do cargo']||''}</td>`;
+                    tbody+=`<tr><td class="sticky-col sticky-matricula">${colab.Matricula}</td><td class="sticky-col sticky-nome">${colab.Nome}</td><td class="sticky-col sticky-cargo">${colab['Descrição do cargo']||''}</td>`;
                     dias.forEach(d=>{
                         const status=obterStatus(colab.Matricula,d);
                         let cls='',txt=status;
@@ -528,7 +591,6 @@
                 });
                 if(dadosFiltrados.length===0)tbody=`<tr><td colspan="${dias.length+3}">Nenhum colaborador encontrado.</td></tr>`;
                 document.getElementById('tbodyAbs').innerHTML=tbody;
-                // Atualiza dropdown de cargos
                 const cargos=[...new Set(dadosHC.map(c=>c['Descrição do cargo']).filter(Boolean))].sort();
                 const sel=document.getElementById('filtroCargo');
                 sel.innerHTML='<option value="">Todos</option>';
@@ -566,8 +628,7 @@
                     if(!faltasPorCargo[cargo])faltasPorCargo[cargo]=0;
                     if(!faltasPorCentro[centro])faltasPorCentro[centro]=0;
                     dias.forEach(d=>{
-                        const status=obterStatus(colab.Matricula,d);
-                        if(status==='FA'){
+                        if(obterStatus(colab.Matricula,d)==='FA'){
                             const data=new Date(d+'T00:00:00');
                             faltasPorDia[diaSemanaNome[data.getDay()]]++;
                             faltasPorCargo[cargo]++;
@@ -577,14 +638,14 @@
                 });
                 const chartOptions={responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},datalabels:{anchor:'end',align:'top',color:'#111',font:{weight:'bold'}}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}};
                 Object.values(chartInstances).forEach(c=>c.destroy());
-                chartInstances.chartDiaSemana=new Chart(document.getElementById('chartDiaSemana'),{type:'bar',data:{labels:diaSemanaNome,datasets:[{label:'Faltas',data:diaSemanaNome.map(d=>faltasPorDia[d]),backgroundColor:'#3182ce'}]},options:chartOptions});
+                chartInstances.chartDiaSemana=new Chart(document.getElementById('chartDiaSemana'),{type:'bar',data:{labels:diaSemanaNome,datasets:[{data:diaSemanaNome.map(d=>faltasPorDia[d]),backgroundColor:'#3182ce'}]},options:chartOptions});
                 const cargos=Object.entries(faltasPorCargo).sort((a,b)=>b[1]-a[1]);
                 chartInstances.chartCargo=new Chart(document.getElementById('chartCargo'),{type:'bar',data:{labels:cargos.map(c=>c[0]),datasets:[{data:cargos.map(c=>c[1]),backgroundColor:'#dd6b20'}]},options:{...chartOptions,indexAxis:'y',plugins:{...chartOptions.plugins,datalabels:{...chartOptions.plugins.datalabels,align:'right'}}}});
                 const centros=Object.entries(faltasPorCentro).sort((a,b)=>b[1]-a[1]);
                 chartInstances.chartCentroCusto=new Chart(document.getElementById('chartCentroCusto'),{type:'bar',data:{labels:centros.map(c=>c[0]),datasets:[{data:centros.map(c=>c[1]),backgroundColor:'#319795'}]},options:{...chartOptions,indexAxis:'y',plugins:{...chartOptions.plugins,datalabels:{...chartOptions.plugins.datalabels,align:'right'}}}});
             }
 
-            // Upload
+            // ========== UPLOAD BASES (mantido igual) ==========
             function log(el,msg){const e=document.getElementById(el);e.textContent+=msg+'\n';e.scrollTop=e.scrollHeight;}
             async function lerArquivo(file){
                 const nome=file.name.toLowerCase();
@@ -682,6 +743,102 @@
                 finally{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-upload"></i> Enviar';}
             }
             window.processarJustificativas=processarJustificativas;
+
+            // ========== GERENCIAR USUÁRIOS (LEVEL 1) ==========
+            async function carregarUsuarios(){
+                if(!currentUser||currentUser.level!==1)return;
+                try{
+                    const {data,error}=await sb.from('USERS').select('*').order('Matricula');
+                    if(error)throw error;
+                    const tbody=document.getElementById('usersTable');
+                    tbody.innerHTML=data.map(u=>`<tr>
+                        <td>${u.Matricula}</td><td>${u.Nome||''}</td>
+                        <td>${u.Level}</td>
+                        <td><button class="btn ghost" onclick="editarUsuario('${u.Matricula}')"><i class="fa-solid fa-pen"></i></button></td>
+                    </tr>`).join('');
+                }catch(e){alert('Erro ao carregar usuários: '+e.message);}
+            }
+
+            function abrirModalUsuario(matricula=null){
+                document.getElementById('modalUsuario').style.display='flex';
+                document.getElementById('muMatricula').value=matricula||'';
+                document.getElementById('muNome').value='';
+                document.getElementById('muPassword').value='';
+                document.getElementById('muLevel').value='4';
+                document.getElementById('muEditingMatricula').value=matricula||'';
+                document.getElementById('modalUsuarioTitle').textContent=matricula?'Editar Usuário':'Novo Usuário';
+                if(matricula){
+                    sb.from('USERS').select('*').eq('Matricula',matricula).limit(1).then(({data})=>{
+                        if(data&&data.length){
+                            document.getElementById('muNome').value=data[0].Nome||'';
+                            document.getElementById('muLevel').value=data[0].Level;
+                            document.getElementById('muMatricula').readOnly=true;
+                        }
+                    });
+                }else{
+                    document.getElementById('muMatricula').readOnly=false;
+                }
+            }
+            window.abrirModalUsuario = () => abrirModalUsuario(null);
+            window.editarUsuario = (mat) => abrirModalUsuario(mat);
+
+            function fecharModalUsuario(){ document.getElementById('modalUsuario').style.display='none'; }
+            window.fecharModalUsuario = fecharModalUsuario;
+
+            async function salvarUsuario(){
+                const matricula = document.getElementById('muMatricula').value.trim();
+                const nome = document.getElementById('muNome').value.trim();
+                const password = document.getElementById('muPassword').value;
+                const level = document.getElementById('muLevel').value;
+                const editing = document.getElementById('muEditingMatricula').value;
+                if(!matricula||!nome){alert('Matrícula e Nome são obrigatórios.');return;}
+                if(!editing && !password){alert('Senha é obrigatória para novo usuário.');return;}
+                const payload = {Matricula:matricula, Nome:nome, Level:Number(level)};
+                if(password) payload.Password = password;
+                const btn = document.getElementById('btnSalvarUsuario');
+                btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+                try{
+                    if(editing){
+                        const {error} = await sb.from('USERS').update(payload).eq('Matricula',editing);
+                        if(error)throw error;
+                    }else{
+                        const {error} = await sb.from('USERS').insert(payload);
+                        if(error)throw error;
+                    }
+                    fecharModalUsuario();
+                    carregarUsuarios();
+                }catch(e){alert('Erro: '+e.message);}
+                finally{btn.disabled=false;btn.textContent='Salvar';}
+            }
+            window.salvarUsuario = salvarUsuario;
+
+            // ========== ALTERAR SENHA ==========
+            function abrirModalAlterarSenha(){
+                document.getElementById('altSenhaAtual').value='';
+                document.getElementById('altSenhaNova').value='';
+                document.getElementById('altSenhaConfirm').value='';
+                document.getElementById('modalAlterarSenha').style.display='flex';
+            }
+            window.abrirModalAlterarSenha = abrirModalAlterarSenha;
+
+            async function alterarSenha(){
+                const atual = document.getElementById('altSenhaAtual').value;
+                const nova = document.getElementById('altSenhaNova').value;
+                const confirm = document.getElementById('altSenhaConfirm').value;
+                if(!atual||!nova||!confirm){alert('Preencha todos os campos.');return;}
+                if(nova!==confirm){alert('Nova senha e confirmação não coincidem.');return;}
+                if(!currentUser)return;
+                try{
+                    const {data,error} = await sb.from('USERS').select('Password').eq('Matricula',currentUser.matricula).limit(1);
+                    if(error)throw error;
+                    if(!data||data.length===0||String(data[0].Password).trim()!==atual.trim()){alert('Senha atual incorreta.');return;}
+                    const {error:updateErr} = await sb.from('USERS').update({Password:nova}).eq('Matricula',currentUser.matricula);
+                    if(updateErr)throw updateErr;
+                    alert('Senha alterada com sucesso.');
+                    document.getElementById('modalAlterarSenha').style.display='none';
+                }catch(e){alert('Erro: '+e.message);}
+            }
+            window.alterarSenha = alterarSenha;
         })();
     </script>
 </body>
