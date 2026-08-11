@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
-        /* ========== ESTILOS GLOBAIS (mantidos integralmente) ========== */
+        /* ========== VARIÁVEIS GLOBAIS ========== */
         :root {
             --bg: #ffffff;
             --bg2: #f5f7fc;
@@ -119,8 +119,7 @@
         .chart-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
         .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
         .btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
-        .sync-log { background: var(--bg2); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: var(--mono); font-size: 0.75rem; margin-top: 12px; }
-        /* ========== PRODUTIVIDADE (tema escuro) ========== */
+        .sync-log { background: var(--bg2); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: var(--mono); font-size: 0.75rem; margin-top: 12px; white-space: pre-wrap; }
         #view-produtividade {
             --bg-prod: #06060d;
             --card-prod: #111127;
@@ -154,7 +153,6 @@
     </style>
 </head>
 <body>
-    <!-- LOGIN -->
     <div class="login-overlay" id="loginOverlay">
         <video id="loginVideo" autoplay loop muted playsinline crossorigin="anonymous"><source src="Video.mp4" type="video/mp4"></video>
         <canvas id="matrixCanvas"></canvas>
@@ -168,8 +166,6 @@
             <div class="login-error" id="loginError"><span>⚠️</span><span id="loginErrorText"></span></div>
         </div>
     </div>
-
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-header"><h2>Headcount Manager</h2></div>
         <nav class="sidebar-nav">
@@ -189,10 +185,7 @@
             <div>Desenvolvido por <strong>Pablo Martins Lopes</strong></div>
         </div>
     </aside>
-
-    <!-- MAIN -->
     <main class="main-content" id="mainContent">
-        <!-- ABSENTEÍSMO -->
         <div class="view active" id="view-absenteismo">
             <div class="page-header"><div class="page-title"><h1>Absenteísmo</h1></div><button class="btn" onclick="carregarDados()"><i class="fa-solid fa-rotate"></i> Atualizar</button></div>
             <div class="kpi-grid">
@@ -212,8 +205,6 @@
                 <div class="chart-box"><h4>Faltas por Cargo</h4><canvas id="chartCargo"></canvas></div>
             </div>
         </div>
-
-        <!-- PRODUTIVIDADE -->
         <div class="view" id="view-produtividade">
             <div class="app-container">
                 <header class="app-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
@@ -236,23 +227,17 @@
                 <div class="table-outer" style="background:#0d0d1f;border-color:#1e1e3a;"><div class="table-scroll" style="max-height:60vh;"><table class="prod-table" id="prodTable"><thead id="prodHead"></thead><tbody id="prodBody"></tbody></table></div></div>
             </div>
         </div>
-
-        <!-- BASES -->
         <div class="view" id="view-bases">
             <div class="page-header"><h1>Atualização de Bases</h1></div>
             <div class="kpi-card" id="panelQuadro" style="display:none;"><h4><i class="fa-solid fa-users"></i> Quadro HC</h4><input type="file" id="quadroFile" accept=".csv,.xlsx"><button class="btn" onclick="uploadQuadro()">Enviar</button><div class="sync-log" id="quadroLog"></div></div>
             <div class="kpi-card" id="panelSuricato" style="display:none;"><h4><i class="fa-solid fa-clock"></i> Suricato</h4><input type="file" id="suricatoFile" accept=".csv,.xlsx"><button class="btn" onclick="uploadSuricato()">Enviar</button><div class="sync-log" id="suricatoLog"></div></div>
             <div class="kpi-card" id="basesRestricted" style="display:none;">🔒 Sem permissão.</div>
         </div>
-
-        <!-- USUÁRIOS -->
         <div class="view" id="view-usuarios">
             <div class="page-header"><h1>Usuários</h1><button class="btn" onclick="abrirModalUsuario()">+ Novo</button></div>
             <table><thead><tr><th>Matrícula</th><th>Nome</th><th>Nível</th><th>Ações</th></tr></thead><tbody id="usersTable"></tbody></table>
         </div>
     </main>
-
-    <!-- MODAL USUÁRIO -->
     <div class="modal-overlay" id="modalUsuario">
         <div class="modal">
             <h3 id="modalUsuarioTitle">Novo Usuário</h3>
@@ -261,33 +246,23 @@
             <div style="margin-bottom:10px;"><label>Senha</label><input type="password" id="muSenha" style="width:100%;padding:8px;"></div>
             <div style="margin-bottom:10px;"><label>Nível</label><select id="muLevel" style="width:100%;padding:8px;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
             <input type="hidden" id="muEdit">
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button class="btn ghost" onclick="fecharModalUsuario()">Cancelar</button>
-                <button class="btn" onclick="salvarUsuario()">Salvar</button>
-            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn ghost" onclick="fecharModalUsuario()">Cancelar</button><button class="btn" onclick="salvarUsuario()">Salvar</button></div>
         </div>
     </div>
-
-    <!-- MODAL ALTERAR SENHA -->
     <div class="modal-overlay" id="modalSenha">
         <div class="modal">
             <h3>Alterar Senha</h3>
             <div style="margin-bottom:10px;"><label>Senha atual</label><input type="password" id="senhaAtual" style="width:100%;padding:8px;"></div>
             <div style="margin-bottom:10px;"><label>Nova</label><input type="password" id="senhaNova" style="width:100%;padding:8px;"></div>
             <div style="margin-bottom:10px;"><label>Confirmar</label><input type="password" id="senhaConfirm" style="width:100%;padding:8px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button class="btn ghost" onclick="document.getElementById('modalSenha').classList.remove('active')">Cancelar</button>
-                <button class="btn" onclick="alterarSenha()">Alterar</button>
-            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn ghost" onclick="document.getElementById('modalSenha').classList.remove('active')">Cancelar</button><button class="btn" onclick="alterarSenha()">Alterar</button></div>
         </div>
     </div>
-
     <script>
-        // ========== SUPABASE ==========
         const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
         Chart.register(ChartDataLabels);
-        let currentUser = null;
-        let dadosHC = [], dadosSuricato = [], dadosJust = [];
+        let currentUser = null, dadosHC = [], dadosSuricato = [], dadosJust = [];
+        let chartInstances = {};
         const CENTROS = ['CD ARUJA - OPERACOES I','CD ARUJA - OPERACOES II','CD ARUJA - OPERACOES III'];
         const TURNOS = {
             'CD ARUJA - OPERACOES I': { ini: '05:00', fim: '15:20' },
@@ -295,14 +270,69 @@
             'CD ARUJA - OPERACOES III': { ini: '21:00', fim: '06:00' }
         };
 
-        // ========== LOGIN ==========
+        function limparValor(v) { return String(v || '').replace(/[.,'"]/g, '').trim(); }
+        function extrairData(dtHora) {
+            if (!dtHora) return null;
+            let str = String(dtHora).replace(/['"]/g, '').trim();
+            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+            if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) return isoMatch[0];
+            const d = new Date(str);
+            return isNaN(d) ? null : d.toISOString().split('T')[0];
+        }
+        function normalizarData(d) {
+            if (!d) return null;
+            let str = String(d).replace(/['"]/g, '').trim();
+            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            return isoMatch ? str : null;
+        }
+
+        // 🔧 Função CORRIGIDA para turnos noturnos
+        function estaNoTurno(centro, dataStr, dtHoraOriginal) {
+            const t = TURNOS[centro];
+            if (!t) return false;
+            const [y, m, d] = dataStr.split('-').map(Number);
+            const intervals = [];
+            if (t.fim === '06:00') {
+                const prevDate = new Date(y, m-1, d-1);
+                const prevY = prevDate.getFullYear(), prevM = prevDate.getMonth(), prevD = prevDate.getDate();
+                intervals.push({
+                    ini: new Date(prevY, prevM, prevD, 21, 0, 0),
+                    fim: new Date(y, m-1, d, 6, 0, 0)
+                });
+                intervals.push({
+                    ini: new Date(y, m-1, d, 21, 0, 0),
+                    fim: new Date(y, m-1, d+1, 6, 0, 0)
+                });
+            } else {
+                const [fh, fm] = t.fim.split(':').map(Number);
+                intervals.push({
+                    ini: new Date(y, m-1, d, ...t.ini.split(':').map(Number)),
+                    fim: new Date(y, m-1, d, fh, fm, 0)
+                });
+            }
+            let str = String(dtHoraOriginal).replace(/['"]/g, '').trim();
+            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+            let reg;
+            if (brMatch) {
+                const [_, dd, mm, yyyy, hh, min, ss] = brMatch;
+                reg = new Date(yyyy, mm-1, dd, hh, min, ss||0);
+            } else {
+                reg = new Date(str);
+            }
+            if (isNaN(reg)) return false;
+            return intervals.some(int => reg >= int.ini && reg <= int.fim);
+        }
+
+        function gerarDias(ini, fim) { const dias = []; const c = new Date(ini+'T00:00:00'); const f = new Date(fim+'T00:00:00'); while (c <= f) { dias.push(c.toISOString().split('T')[0]); c.setDate(c.getDate()+1); } return dias; }
+
         async function tentarLogin() {
-            const u = document.getElementById('loginUser').value.trim();
-            const p = document.getElementById('loginPass').value;
+            const u = document.getElementById('loginUser').value.trim(), p = document.getElementById('loginPass').value;
             if (!u || !p) return alert('Preencha campos.');
-            const btn = document.getElementById('loginBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            const btn = document.getElementById('loginBtn'); btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
                 const { data } = await sb.from('USERS').select('*').eq('Matricula', u).limit(1);
                 if (!data?.length || String(data[0].Password).trim() !== p.trim()) throw new Error('Credenciais inválidas.');
@@ -332,12 +362,11 @@
             document.getElementById('userName').textContent = currentUser.nome.split(' ')[0];
             document.getElementById('userAvatar').textContent = currentUser.nome.substring(0,2).toUpperCase();
             const lvl = currentUser.level;
-            document.getElementById('userLevel').textContent = lvl === 1 ? 'Total' : lvl === 2 ? 'RH' : lvl === 3 ? 'Analista' : 'Visualizador';
-            document.getElementById('navBases').style.display = lvl < 4 ? '' : 'none';
-            document.getElementById('navUsuarios').style.display = lvl === 1 ? '' : 'none';
+            document.getElementById('userLevel').textContent = lvl===1?'Total':lvl===2?'RH':lvl===3?'Analista':'Visualizador';
+            document.getElementById('navBases').style.display = lvl<4?'':'none';
+            document.getElementById('navUsuarios').style.display = lvl===1?'':'none';
         }
 
-        // ========== NAVEGAÇÃO ==========
         function navegar(page) {
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
@@ -348,21 +377,19 @@
             if (page === 'usuarios') carregarUsuarios();
             if (page === 'bases') {
                 const lvl = currentUser?.level || 4;
-                document.getElementById('panelQuadro').style.display = (lvl === 1 || lvl === 2) ? '' : 'none';
-                document.getElementById('panelSuricato').style.display = (lvl === 1 || lvl === 3) ? '' : 'none';
-                document.getElementById('basesRestricted').style.display = (lvl < 4) ? 'none' : '';
+                document.getElementById('panelQuadro').style.display = (lvl===1||lvl===2)?'':'none';
+                document.getElementById('panelSuricato').style.display = (lvl===1||lvl===3)?'':'none';
+                document.getElementById('basesRestricted').style.display = (lvl<4)?'none':'';
             }
         }
         document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navegar(n.dataset.page)));
 
-        // ========== TEMA ==========
         document.getElementById('themeToggle').addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
             const d = document.body.classList.contains('dark-mode');
             document.getElementById('themeToggle').innerHTML = d ? '<i class="fa-solid fa-sun"></i><span>Modo Claro</span>' : '<i class="fa-solid fa-moon"></i><span>Modo Escuro</span>';
         });
 
-        // ========== DADOS ==========
         async function carregarDados() {
             try {
                 const [hc, sur, jus] = await Promise.all([
@@ -376,60 +403,17 @@
                 if (currentUser && currentUser.level > 2 && currentUser.nome) {
                     dadosHC = dadosHC.filter(c => (c['Nome do gestor'] || '').toLowerCase().includes(currentUser.nome.toLowerCase()));
                 }
-            } catch (e) { console.warn('Usando dados mock', e); gerarMock(); }
+            } catch (e) { console.warn('Erro ao carregar dados', e); }
             initDatasAbs();
             aplicarFiltroAbs();
         }
         window.carregarDados = carregarDados;
-
-        function gerarMock() {
-            dadosHC = [];
-            for (let i = 0; i < 5; i++) dadosHC.push({ Matricula: `10${i}`, Nome: `Colab ${i}`, 'Descrição do cargo': i < 2 ? 'Analista' : 'Operador', 'Descrição do centro de custo': CENTROS[i % 3], 'Nome do gestor': 'Gestor X' });
-            dadosSuricato = [];
-            dadosJust = [];
-        }
 
         function initDatasAbs() {
             const hoje = new Date();
             document.getElementById('dataInicio').value = hoje.toISOString().split('T')[0];
             document.getElementById('dataFim').value = hoje.toISOString().split('T')[0];
         }
-
-        // ========== ABSENTEÍSMO ==========
-        function aplicarFiltroAbs() {
-            const ini = document.getElementById('dataInicio').value;
-            const fim = document.getElementById('dataFim').value;
-            if (!ini || !fim) return;
-            const dias = gerarDias(ini, fim);
-            const busca = document.getElementById('filtroBusca').value.toLowerCase();
-            const cargoF = document.getElementById('filtroCargo').value;
-            let lista = dadosHC.filter(c => {
-                if (busca && !c.Matricula.toLowerCase().includes(busca) && !c.Nome.toLowerCase().includes(busca)) return false;
-                if (cargoF && c['Descrição do cargo'] !== cargoF) return false;
-                return true;
-            }).sort((a, b) => a.Nome.localeCompare(b.Nome, 'pt-BR'));
-            let th = '<tr><th class="sticky-col sticky-matricula">Mat</th><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
-            dias.forEach(d => { const p = d.split('-'); th += `<th>${p[2]}/${p[1]}</th>`; });
-            th += '</tr>';
-            document.getElementById('theadAbs').innerHTML = th;
-            let tb = '';
-            lista.forEach(c => {
-                tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
-                dias.forEach(d => {
-                    const st = status(c.Matricula, c['Descrição do centro de custo'], d);
-                    tb += `<td class="${st === 'P' ? 'cell-presente' : st === 'FA' ? 'cell-falta' : 'cell-justificativa'}">${st}</td>`;
-                });
-                tb += '</tr>';
-            });
-            document.getElementById('tbodyAbs').innerHTML = tb || `<tr><td colspan="${dias.length+3}">Nenhum dado.</td></tr>`;
-            atualizarKPIsAbs(lista, dias);
-            const cargos = [...new Set(dadosHC.map(c => c['Descrição do cargo']).filter(Boolean))].sort();
-            const sel = document.getElementById('filtroCargo');
-            sel.innerHTML = '<option value="">Todos</option>';
-            cargos.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
-            if (cargoF) sel.value = cargoF;
-        }
-        window.aplicarFiltroAbs = aplicarFiltroAbs;
 
         function status(matricula, centro, data) {
             if (!CENTROS.includes(centro)) return 'FA';
@@ -439,45 +423,90 @@
             return just ? just.MOTIVO || 'J' : 'FA';
         }
 
-        function extrairData(dt) { return dt?.substring(0, 10) || null; }
-        function normalizarData(d) { return d ? d.replace(/\//g, '-') : null; }
-        function estaNoTurno(centro, data, dtHora) {
-            const t = TURNOS[centro]; if (!t) return false;
-            const ini = new Date(data + 'T' + t.ini + ':00');
-            let fim = new Date(data + 'T' + t.fim + ':00');
-            if (t.fim === '06:00') fim = new Date(new Date(data).getTime() + 86400000 + 6 * 3600000);
-            const reg = new Date(dtHora);
-            return reg >= ini && reg <= fim;
+        function aplicarFiltroAbs() {
+            const ini = document.getElementById('dataInicio').value, fim = document.getElementById('dataFim').value;
+            if (!ini || !fim) return;
+            const dias = gerarDias(ini, fim);
+            const busca = document.getElementById('filtroBusca').value.toLowerCase();
+            const cargoF = document.getElementById('filtroCargo').value;
+            let lista = dadosHC.filter(c => {
+                if (busca && !c.Matricula.toLowerCase().includes(busca) && !c.Nome.toLowerCase().includes(busca)) return false;
+                if (cargoF && c['Descrição do cargo'] !== cargoF) return false;
+                return true;
+            }).sort((a,b) => a.Nome.localeCompare(b.Nome,'pt-BR'));
+            let th = '<tr><th class="sticky-col sticky-matricula">Mat</th><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
+            dias.forEach(d => { const p = d.split('-'); th += `<th>${p[2]}/${p[1]}</th>`; });
+            th += '</tr>'; document.getElementById('theadAbs').innerHTML = th;
+            let tb = '';
+            lista.forEach(c => {
+                tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
+                dias.forEach(d => {
+                    const st = status(c.Matricula, c['Descrição do centro de custo'], d);
+                    tb += `<td class="${st==='P'?'cell-presente':st==='FA'?'cell-falta':'cell-justificativa'}">${st}</td>`;
+                });
+                tb += '</tr>';
+            });
+            document.getElementById('tbodyAbs').innerHTML = tb || `<tr><td colspan="${dias.length+3}">Nenhum dado.</td></tr>`;
+            atualizarKPIsAbs(lista, dias);
+            renderizarGraficos(lista, dias);
+            const cargos = [...new Set(dadosHC.map(c=>c['Descrição do cargo']).filter(Boolean))].sort();
+            const sel = document.getElementById('filtroCargo');
+            sel.innerHTML = '<option value="">Todos</option>';
+            cargos.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+            if (cargoF) sel.value = cargoF;
         }
-        function gerarDias(ini, fim) { const dias = []; const c = new Date(ini); const f = new Date(fim); while (c <= f) { dias.push(c.toISOString().split('T')[0]); c.setDate(c.getDate() + 1); } return dias; }
+        window.aplicarFiltroAbs = aplicarFiltroAbs;
 
         function atualizarKPIsAbs(lista, dias) {
-            let faltas = 0, just = 0;
-            lista.forEach(c => dias.forEach(d => { const s = status(c.Matricula, c['Descrição do centro de custo'], d); if (s === 'FA') faltas++; else if (s !== 'P') just++; }));
+            let faltas=0, just=0;
+            lista.forEach(c => dias.forEach(d => { const s = status(c.Matricula, c['Descrição do centro de custo'], d); if (s==='FA') faltas++; else if (s!=='P') just++; }));
             document.getElementById('kpiFaltas').textContent = faltas;
-            document.getElementById('kpiTaxa').textContent = lista.length ? (faltas / (lista.length * dias.length) * 100).toFixed(1) + '%' : '0%';
+            document.getElementById('kpiTaxa').textContent = lista.length ? (faltas/(lista.length*dias.length)*100).toFixed(1)+'%' : '0%';
             document.getElementById('kpiJust').textContent = just;
         }
 
-        // ========== PRODUTIVIDADE ==========
+        function renderizarGraficos(lista, dias) {
+            if (chartInstances.chartDia) chartInstances.chartDia.destroy();
+            if (chartInstances.chartCargo) chartInstances.chartCargo.destroy();
+            const diaSemanaNome = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+            const faltasPorDia = {}; diaSemanaNome.forEach(d => faltasPorDia[d]=0);
+            const faltasPorCargo = {};
+            lista.forEach(c => {
+                const cargo = c['Descrição do cargo'] || 'Não informado';
+                if (!faltasPorCargo[cargo]) faltasPorCargo[cargo] = 0;
+                dias.forEach(d => {
+                    if (status(c.Matricula, c['Descrição do centro de custo'], d) === 'FA') {
+                        const data = new Date(d+'T00:00:00');
+                        faltasPorDia[diaSemanaNome[data.getDay()]]++;
+                        faltasPorCargo[cargo]++;
+                    }
+                });
+            });
+            const ctxDia = document.getElementById('chartDia').getContext('2d');
+            chartInstances.chartDia = new Chart(ctxDia, { type:'bar', data:{ labels: diaSemanaNome, datasets:[{ data: diaSemanaNome.map(d=>faltasPorDia[d]), backgroundColor:'#3182ce' }] }, options:{ responsive:true, plugins:{ legend:{display:false}, datalabels:{ anchor:'end', align:'top', color:'#111' } }, scales:{ y:{ beginAtZero:true, ticks:{precision:0} } } } });
+            const cargos = Object.entries(faltasPorCargo).sort((a,b)=>b[1]-a[1]);
+            const ctxCargo = document.getElementById('chartCargo').getContext('2d');
+            chartInstances.chartCargo = new Chart(ctxCargo, { type:'bar', data:{ labels: cargos.map(c=>c[0]), datasets:[{ data: cargos.map(c=>c[1]), backgroundColor:'#dd6b20' }] }, options:{ indexAxis:'y', responsive:true, plugins:{ legend:{display:false}, datalabels:{ anchor:'end', align:'right', color:'#111' } }, scales:{ x:{ beginAtZero:true, ticks:{precision:0} } } } });
+        }
+
         let prodEmployees = [], prodData = {};
         function initProdutividade() {
             if (prodEmployees.length === 0) {
-                const nomes = ['Antônio', 'Beatriz', 'Carlos', 'Daniele', 'Eduardo'];
-                nomes.forEach((n, i) => prodEmployees.push({ id: i + 1, nome: n, cargo: i < 2 ? 'Analista' : 'Operador', admissao: '2020-01-01' }));
-                for (let i = 0; i < 30; i++) { const d = new Date(); d.setDate(d.getDate() - i); const ds = d.toISOString().split('T')[0]; prodEmployees.forEach(e => prodData[`${e.id}_${ds}`] = { boxes: Math.floor(Math.random() * 300) + 40, visits: Math.floor(Math.random() * 30) + 2 }); }
+                const nomes = ['Antônio','Beatriz','Carlos','Daniele','Eduardo'];
+                nomes.forEach((n,i) => prodEmployees.push({ id:i+1, nome:n, cargo:i<2?'Analista':'Operador', admissao:'2020-01-01' }));
+                for (let i=0;i<30;i++) { const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toISOString().split('T')[0]; prodEmployees.forEach(e => prodData[`${e.id}_${ds}`] = { boxes:Math.floor(Math.random()*300)+40, visits:Math.floor(Math.random()*30)+2 }); }
             }
             document.getElementById('prodInicio').value = '';
             document.getElementById('prodFim').value = '';
             document.getElementById('prodNome').value = '';
-            document.getElementById('prodCargo').innerHTML = '<option value="">Todos</option>' + [...new Set(prodEmployees.map(e => e.cargo))].map(c => `<option>${c}</option>`).join('');
+            document.getElementById('prodCargo').innerHTML = '<option value="">Todos</option>' + [...new Set(prodEmployees.map(e=>e.cargo))].map(c=>`<option>${c}</option>`).join('');
             applyFiltersProd();
         }
         function applyFiltersProd() {
             const nome = document.getElementById('prodNome').value.toLowerCase();
             const cargo = document.getElementById('prodCargo').value;
             let ini = document.getElementById('prodInicio').value, fim = document.getElementById('prodFim').value;
-            if (!ini || !fim) { const hoje = new Date(); fim = hoje.toISOString().split('T')[0]; ini = new Date(hoje.getTime() - 6 * 86400000).toISOString().split('T')[0]; }
+            if (!ini || !fim) { const hoje = new Date(); fim = hoje.toISOString().split('T')[0]; ini = new Date(hoje.getTime()-6*86400000).toISOString().split('T')[0]; }
             const dias = gerarDias(ini, fim);
             let lista = prodEmployees.filter(e => (!nome || e.nome.toLowerCase().includes(nome)) && (!cargo || e.cargo === cargo));
             let th = '<tr><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
@@ -486,70 +515,57 @@
             let tb = '';
             lista.forEach(e => {
                 tb += `<tr><td class="sticky-col sticky-nome">${e.nome}</td><td class="sticky-col sticky-cargo">${e.cargo}</td>`;
-                dias.forEach(d => { const v = prodData[`${e.id}_${d}`]?.boxes || 0; tb += `<td class="${v > 200 ? 'cell-high' : v < 100 ? 'cell-low' : ''}" style="color:${v>200?'#5fe08b':v<100?'#e0886a':'#e0c278'}">${v}</td>`; });
+                dias.forEach(d => { const v = prodData[`${e.id}_${d}`]?.boxes || 0; tb += `<td style="color:${v>200?'#5fe08b':v<100?'#e0886a':'#e0c278'}">${v}</td>`; });
                 tb += '</tr>';
             });
             document.getElementById('prodBody').innerHTML = tb || `<tr><td colspan="${dias.length+2}">Nenhum.</td></tr>`;
-            let totalBoxes = 0, totalVisits = 0, cells = 0;
-            lista.forEach(e => dias.forEach(d => { totalBoxes += prodData[`${e.id}_${d}`]?.boxes || 0; totalVisits += prodData[`${e.id}_${d}`]?.visits || 0; cells++; }));
-            const avgB = cells ? (totalBoxes / cells).toFixed(1) : 0, avgV = cells ? (totalVisits / cells).toFixed(1) : 0;
+            let totalBoxes=0, totalVisits=0, cells=0;
+            lista.forEach(e => dias.forEach(d => { totalBoxes += prodData[`${e.id}_${d}`]?.boxes||0; totalVisits += prodData[`${e.id}_${d}`]?.visits||0; cells++; }));
             document.getElementById('kpiProd').innerHTML = `
-            <div class="kpi-card"><div class="kpi-icon boxes"><i class="fa-solid fa-box"></i></div><div class="kpi-label">Média Caixas</div><div class="kpi-value">${avgB}</div></div>
-            <div class="kpi-card"><div class="kpi-icon visits"><i class="fa-solid fa-eye"></i></div><div class="kpi-label">Média Visitas</div><div class="kpi-value">${avgV}</div></div>
+            <div class="kpi-card"><div class="kpi-icon boxes"><i class="fa-solid fa-box"></i></div><div class="kpi-label">Média Caixas</div><div class="kpi-value">${cells?(totalBoxes/cells).toFixed(1):0}</div></div>
+            <div class="kpi-card"><div class="kpi-icon visits"><i class="fa-solid fa-eye"></i></div><div class="kpi-label">Média Visitas</div><div class="kpi-value">${cells?(totalVisits/cells).toFixed(1):0}</div></div>
             <div class="kpi-card"><div class="kpi-icon ratio"><i class="fa-solid fa-percent"></i></div><div class="kpi-label">Total Caixas</div><div class="kpi-value">${totalBoxes}</div></div>
             <div class="kpi-card"><div class="kpi-icon total-visits"><i class="fa-solid fa-route"></i></div><div class="kpi-label">Total Visitas</div><div class="kpi-value">${totalVisits}</div></div>`;
         }
         window.applyFiltersProd = applyFiltersProd;
-        window.resetFiltersProd = () => { document.getElementById('prodNome').value = ''; document.getElementById('prodCargo').value = ''; document.getElementById('prodInicio').value = ''; document.getElementById('prodFim').value = ''; applyFiltersProd(); };
-        window.openModalProd = () => {
-            const nome = prompt('Nome:'); if (!nome) return;
-            const cargo = prompt('Cargo:') || 'Operador';
-            prodEmployees.push({ id: Math.max(...prodEmployees.map(e => e.id), 0) + 1, nome, cargo, admissao: new Date().toISOString().split('T')[0] });
-            applyFiltersProd();
-        };
+        window.resetFiltersProd = () => { document.getElementById('prodNome').value=''; document.getElementById('prodCargo').value=''; document.getElementById('prodInicio').value=''; document.getElementById('prodFim').value=''; applyFiltersProd(); };
+        window.openModalProd = () => { const nome = prompt('Nome:'); if (!nome) return; const cargo = prompt('Cargo:')||'Operador'; prodEmployees.push({ id: Math.max(...prodEmployees.map(e=>e.id),0)+1, nome, cargo, admissao: new Date().toISOString().split('T')[0] }); applyFiltersProd(); };
 
-        // ========== USUÁRIOS ==========
         async function carregarUsuarios() {
             const { data } = await sb.from('USERS').select('*').order('Matricula');
-            document.getElementById('usersTable').innerHTML = (data || []).map(u => `<tr><td>${u.Matricula}</td><td>${u.Nome||''}</td><td>${u.Level}</td><td><button class="btn ghost" onclick="editarUsuario('${u.Matricula}')"><i class="fa-solid fa-pen"></i></button></td></tr>`).join('');
+            document.getElementById('usersTable').innerHTML = (data||[]).map(u => `<tr><td>${u.Matricula}</td><td>${u.Nome||''}</td><td>${u.Level}</td><td><button class="btn ghost" onclick="editarUsuario('${u.Matricula}')"><i class="fa-solid fa-pen"></i></button></td></tr>`).join('');
         }
-        window.abrirModalUsuario = (mat = null) => {
+        window.abrirModalUsuario = (mat=null) => {
             document.getElementById('modalUsuario').classList.add('active');
-            document.getElementById('muMatricula').value = mat || '';
+            document.getElementById('muMatricula').value = mat||'';
             document.getElementById('muNome').value = '';
             document.getElementById('muSenha').value = '';
             document.getElementById('muLevel').value = '4';
-            document.getElementById('muEdit').value = mat || '';
+            document.getElementById('muEdit').value = mat||'';
             if (mat) {
-                sb.from('USERS').select('*').eq('Matricula', mat).limit(1).then(({ data }) => {
-                    if (data?.length) { document.getElementById('muNome').value = data[0].Nome || ''; document.getElementById('muLevel').value = data[0].Level; document.getElementById('muMatricula').readOnly = true; }
+                sb.from('USERS').select('*').eq('Matricula',mat).limit(1).then(({data}) => {
+                    if (data?.length) { document.getElementById('muNome').value = data[0].Nome||''; document.getElementById('muLevel').value = data[0].Level; document.getElementById('muMatricula').readOnly = true; }
                 });
             } else document.getElementById('muMatricula').readOnly = false;
         };
         window.editarUsuario = mat => abrirModalUsuario(mat);
         window.fecharModalUsuario = () => document.getElementById('modalUsuario').classList.remove('active');
         window.salvarUsuario = async () => {
-            const mat = document.getElementById('muMatricula').value.trim();
-            const nome = document.getElementById('muNome').value.trim();
-            const senha = document.getElementById('muSenha').value;
-            const level = document.getElementById('muLevel').value;
-            const edit = document.getElementById('muEdit').value;
+            const mat = document.getElementById('muMatricula').value.trim(), nome = document.getElementById('muNome').value.trim();
+            const senha = document.getElementById('muSenha').value, level = document.getElementById('muLevel').value, edit = document.getElementById('muEdit').value;
             if (!mat || !nome) return alert('Preencha.');
-            const payload = { Matricula: mat, Nome: nome, Level: Number(level) };
+            const payload = { Matricula:mat, Nome:nome, Level:Number(level) };
             if (senha) payload.Password = senha;
             try {
-                if (edit) await sb.from('USERS').update(payload).eq('Matricula', edit);
+                if (edit) await sb.from('USERS').update(payload).eq('Matricula',edit);
                 else await sb.from('USERS').insert(payload);
                 fecharModalUsuario(); carregarUsuarios();
             } catch (e) { alert(e.message); }
         };
 
-        // ========== SENHA ==========
         window.abrirModalAlterarSenha = () => document.getElementById('modalSenha').classList.add('active');
         window.alterarSenha = async () => {
-            const atual = document.getElementById('senhaAtual').value;
-            const nova = document.getElementById('senhaNova').value;
-            const conf = document.getElementById('senhaConfirm').value;
+            const atual = document.getElementById('senhaAtual').value, nova = document.getElementById('senhaNova').value, conf = document.getElementById('senhaConfirm').value;
             if (!atual || !nova || nova !== conf) return alert('Verifique.');
             try {
                 const { data } = await sb.from('USERS').select('Password').eq('Matricula', currentUser.matricula).limit(1);
@@ -559,23 +575,45 @@
             } catch (e) { alert(e.message); }
         };
 
-        // ========== UPLOAD APERFEIÇOADO ==========
+        function detectDelim(linha) { let melhor=','; let max=0; [',',';','\t','|'].forEach(d => { const n = linha.split(d).length; if (n>max) { max=n; melhor=d; } }); return melhor; }
+        async function lerArquivoComoMatriz(file) {
+            const nome = file.name.toLowerCase();
+            if (nome.endsWith('.csv') || nome.endsWith('.txt')) {
+                const text = await file.text();
+                const linhas = text.split(/\r?\n/).filter(l => l.trim());
+                if (!linhas.length) return [];
+                const delim = detectDelim(linhas[0]);
+                return linhas.map(l => l.split(delim).map(v => limparValor(v)));
+            } else {
+                const buf = await file.arrayBuffer();
+                const wb = XLSX.read(buf, { type:'array' });
+                const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+                return data.filter(row => row.some(cell => cell !== '')).map(row => row.map(cell => limparValor(cell)));
+            }
+        }
+
         async function uploadQuadro() {
             const file = document.getElementById('quadroFile').files[0]; if (!file) return;
             const log = document.getElementById('quadroLog'); log.textContent = 'Processando...';
             try {
-                const data = await lerArquivo(file);
-                const regs = data.map(obj => ({
-                    Matricula: obj.Matricula,
-                    Nome: obj.Nome,
-                    'Descrição do cargo': obj['Descrição do cargo'] || '',
-                    'Descrição do centro de custo': obj['Descrição do centro de custo'] || '',
-                    'Nome do gestor': obj['Nome do gestor'] || '',
-                })).filter(r => r.Matricula);
-                for (let i = 0; i < regs.length; i += 200) { await sb.from('HC').upsert(regs.slice(i, i + 200), { onConflict: 'Matricula' }); }
-                log.textContent = '✅ Concluído.';
-                await carregarDados(); // recarrega os dados
-            } catch (e) { log.textContent = '❌ ' + e.message; }
+                const matriz = await lerArquivoComoMatriz(file);
+                if (matriz.length < 2) { log.textContent = 'Arquivo vazio.'; return; }
+                const cabecalho = matriz[0].map(h => h.replace(/[^a-zA-ZÀ-ÿ\s]/g, '').trim());
+                const dados = matriz.slice(1);
+                const registros = dados.map(linha => {
+                    const obj = {}; cabecalho.forEach((k,i) => obj[k] = linha[i] || '');
+                    return {
+                        Matricula: obj['Matricula'] || obj['MATRICULA'] || '',
+                        Nome: obj['Nome'] || obj['NOME'] || '',
+                        'Descrição do cargo': obj['Descrição do cargo'] || obj['Descricao do cargo'] || '',
+                        'Descrição do centro de custo': obj['Descrição do centro de custo'] || obj['Descricao do centro de custo'] || '',
+                        'Nome do gestor': obj['Nome do gestor'] || obj['Gestor'] || ''
+                    };
+                }).filter(r => r.Matricula);
+                for (let i=0; i<registros.length; i+=200) await sb.from('HC').upsert(registros.slice(i,i+200), { onConflict:'Matricula' });
+                log.textContent = `✅ ${registros.length} registros.`;
+                await carregarDados();
+            } catch (e) { log.textContent = '❌ '+e.message; }
         }
         window.uploadQuadro = uploadQuadro;
 
@@ -583,83 +621,50 @@
             const file = document.getElementById('suricatoFile').files[0]; if (!file) return;
             const log = document.getElementById('suricatoLog'); log.textContent = 'Processando...';
             try {
-                const data = await lerArquivo(file);
-                // Extrai apenas colunas A (DTA_HORA) e E (MATRICULA)
-                const registrosRaw = data.map(row => {
-                    // Pega a primeira e a quinta coluna (considerando que o CSV tem cabeçalho)
-                    const keys = Object.keys(row);
-                    const colA = row[keys[0]];  // primeira coluna
-                    const colE = row[keys[4]];  // quinta coluna (índice 4)
-                    // Remove separadores de milhares (vírgulas) dos valores
-                    const dta = String(colA || '').replace(/,/g, '').trim();
-                    const mat = String(colE || '').replace(/,/g, '').trim();
-                    return { DTA_HORA: dta, MATRICULA: mat };
-                }).filter(r => r.DTA_HORA && r.MATRICULA);
-                // Remove duplicatas do próprio arquivo
-                const uniqueMap = new Map();
-                registrosRaw.forEach(r => { const key = r.DTA_HORA + '|' + r.MATRICULA; if (!uniqueMap.has(key)) uniqueMap.set(key, r); });
-                const novos = Array.from(uniqueMap.values());
-                if (novos.length === 0) { log.textContent = 'Nenhum registro válido.'; return; }
-                log.textContent = `Registros únicos no arquivo: ${novos.length}. Verificando existentes...`;
-                // Busca registros existentes no Supabase (pode ser paginado)
-                const existentesSet = new Set();
-                let from = 0, pageSize = 1000;
+                const matriz = await lerArquivoComoMatriz(file);
+                if (matriz.length < 2) { log.textContent = 'Arquivo vazio.'; return; }
+                const dados = matriz.slice(1);
+                const registros = dados.map(linha => ({ DTA_HORA: linha[0] || '', MATRICULA: linha[4] || '' })).filter(r => r.DTA_HORA && r.MATRICULA);
+                if (!registros.length) { log.textContent = 'Nenhum registro válido.'; return; }
+                const unicos = [...new Map(registros.map(r => [r.DTA_HORA+'|'+r.MATRICULA, r])).values()];
+                log.textContent += `\nÚnicos: ${unicos.length}. Buscando existentes...`;
+                const existentes = new Set();
+                let from=0, size=1000;
                 while (true) {
-                    const { data: batch, error } = await sb.from('SURICATO').select('DTA_HORA, MATRICULA').range(from, from + pageSize - 1);
+                    const { data: batch, error } = await sb.from('SURICATO').select('DTA_HORA,MATRICULA').range(from, from+size-1);
                     if (error) throw error;
-                    (batch || []).forEach(r => existentesSet.add(r.DTA_HORA + '|' + r.MATRICULA));
-                    if (!batch || batch.length < pageSize) break;
-                    from += pageSize;
+                    batch?.forEach(r => existentes.add(r.DTA_HORA+'|'+r.MATRICULA));
+                    if (!batch || batch.length < size) break;
+                    from += size;
                 }
-                // Filtra apenas os que não existem
-                const paraInserir = novos.filter(r => !existentesSet.has(r.DTA_HORA + '|' + r.MATRICULA));
-                log.textContent += `\nExistentes: ${existentesSet.size}. Novos a inserir: ${paraInserir.length}.`;
-                if (paraInserir.length === 0) { log.textContent += '\n✅ Nenhum registro novo.'; return; }
-                // Insere em lotes
-                for (let i = 0; i < paraInserir.length; i += 200) {
-                    const lote = paraInserir.slice(i, i + 200);
-                    const { error } = await sb.from('SURICATO').insert(lote);
-                    if (error) throw error;
-                }
+                const inserir = unicos.filter(r => !existentes.has(r.DTA_HORA+'|'+r.MATRICULA));
+                log.textContent += `\nNovos: ${inserir.length}.`;
+                if (!inserir.length) { log.textContent += '\n✅ Nenhum novo.'; return; }
+                for (let i=0; i<inserir.length; i+=200) await sb.from('SURICATO').insert(inserir.slice(i,i+200));
                 log.textContent += '\n✅ Upload concluído.';
-                await carregarDados(); // recarrega dados
-            } catch (e) { log.textContent = '❌ ' + e.message; }
+                await carregarDados();
+            } catch (e) { log.textContent = '❌ '+e.message; }
         }
         window.uploadSuricato = uploadSuricato;
 
-        async function lerArquivo(file) {
-            const nome = file.name.toLowerCase();
-            if (nome.endsWith('.csv') || nome.endsWith('.txt')) {
-                const text = await file.text();
-                const linhas = text.split(/\r?\n/).filter(l => l.trim());
-                const delim = linhas[0].includes(';') ? ';' : ',';
-                const h = linhas[0].split(delim).map(x => x.replace(/"/g, '').trim());
-                return linhas.slice(1).map(l => { const v = l.split(delim).map(x => x.replace(/"/g, '').trim()); const o = {}; h.forEach((k, i) => o[k] = v[i] || ''); return o; });
-            }
-            const buf = await file.arrayBuffer();
-            const wb = XLSX.read(buf, { type: 'array' });
-            return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        }
-
-        // ========== MATRIX ==========
         (function() {
             const canvas = document.getElementById('matrixCanvas'), ctx = canvas.getContext('2d');
             const video = document.getElementById('loginVideo');
             const chars = 'ｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ1234567890'.split('');
             const fontSize = 32; let cols, drops, id, active = false;
-            function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; cols = Math.floor(canvas.width / fontSize); drops = Array(cols).fill(1); }
+            function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; cols = Math.floor(canvas.width/fontSize); drops = Array(cols).fill(1); }
             function draw() {
-                ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.font = fontSize + 'px monospace'; ctx.fillStyle = '#0F0';
-                for (let i = 0; i < drops.length; i++) { const t = chars[Math.floor(Math.random() * chars.length)]; ctx.fillText(t, i * fontSize, drops[i] * fontSize); if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0; drops[i] += 0.3; }
+                ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.font = fontSize+'px monospace'; ctx.fillStyle = '#0F0';
+                for (let i=0;i<drops.length;i++) { const t = chars[Math.floor(Math.random()*chars.length)]; ctx.fillText(t,i*fontSize,drops[i]*fontSize); if (drops[i]*fontSize>canvas.height&&Math.random()>0.975) drops[i]=0; drops[i]+=0.3; }
                 id = requestAnimationFrame(draw);
             }
-            function start() { if (!active) return; canvas.style.display = 'block'; if (video) video.style.display = 'none'; resize(); id = requestAnimationFrame(draw); }
-            function stop() { active = false; canvas.style.display = 'none'; if (video) video.style.display = 'block'; if (id) cancelAnimationFrame(id); ctx.clearRect(0, 0, canvas.width, canvas.height); }
-            document.getElementById('loginUser').addEventListener('input', function() { if (this.value === '5520967') { active = true; start(); } else stop(); });
-            window.addEventListener('resize', () => { if (active) resize(); });
+            function start() { if (!active) return; canvas.style.display='block'; if(video)video.style.display='none'; resize(); id=requestAnimationFrame(draw); }
+            function stop() { active=false; canvas.style.display='none'; if(video)video.style.display='block'; if(id)cancelAnimationFrame(id); ctx.clearRect(0,0,canvas.width,canvas.height); }
+            document.getElementById('loginUser').addEventListener('input', function(){ if(this.value==='5520967'){ active=true; start(); } else stop(); });
+            window.addEventListener('resize', ()=>{ if(active)resize(); });
             stop();
-            if (video) video.play().catch(() => {});
+            if(video) video.play().catch(()=>{});
         })();
     </script>
 </body>
