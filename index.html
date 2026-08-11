@@ -115,6 +115,7 @@
         .cell-presente { color: var(--green); font-weight: 700; }
         .cell-justificativa { color: var(--orange); font-weight: 600; }
         .cell-falta { color: var(--red); font-weight: 700; }
+        .cell-folga { color: var(--blue); font-weight: 700; }
         .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-top: 24px; }
         .chart-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
         .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
@@ -261,7 +262,7 @@
     <script>
         const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
         Chart.register(ChartDataLabels);
-        let currentUser = null, dadosHC = [], dadosSuricato = [], dadosJust = [];
+        let currentUser = null, dadosHC = [], dadosSuricato = [], dadosJust = [], dadosFeriados = [];
         let chartInstances = {};
         const CENTROS = ['CD ARUJA - OPERACOES I','CD ARUJA - OPERACOES II','CD ARUJA - OPERACOES III'];
         const TURNOS = {
@@ -290,8 +291,7 @@
             return isoMatch ? str : null;
         }
 
-        // 🔧 Função CORRIGIDA para turnos noturnos
-        function estaNoTurno(centro, dataStr, dtHoraOriginal) {
+        function estaNoTurno(centro, dataStr, horaStr) {
             const t = TURNOS[centro];
             if (!t) return false;
             const [y, m, d] = dataStr.split('-').map(Number);
@@ -314,15 +314,8 @@
                     fim: new Date(y, m-1, d, fh, fm, 0)
                 });
             }
-            let str = String(dtHoraOriginal).replace(/['"]/g, '').trim();
-            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
-            let reg;
-            if (brMatch) {
-                const [_, dd, mm, yyyy, hh, min, ss] = brMatch;
-                reg = new Date(yyyy, mm-1, dd, hh, min, ss||0);
-            } else {
-                reg = new Date(str);
-            }
+            const [hh, mm, ss] = horaStr.split(':').map(Number);
+            const reg = new Date(y, m-1, d, hh, mm, ss || 0);
             if (isNaN(reg)) return false;
             return intervals.some(int => reg >= int.ini && reg <= int.fim);
         }
@@ -392,14 +385,44 @@
 
         async function carregarDados() {
             try {
-                const [hc, sur, jus] = await Promise.all([
+                const [hc, jus] = await Promise.all([
                     sb.from('HC').select('*'),
-                    sb.from('SURICATO').select('*'),
                     sb.from('Justificativas').select('*')
                 ]);
                 dadosHC = (hc.data || []).filter(c => CENTROS.includes(c['Descrição do centro de custo'] || ''));
-                dadosSuricato = sur.data || [];
                 dadosJust = jus.data || [];
+
+                // Carrega SURICATO com paginação
+                let suricatoData = [];
+                let rangeFrom = 0;
+                const rangeSize = 1000;
+                while (true) {
+                    const { data, error } = await sb.from('SURICATO').select('*').range(rangeFrom, rangeFrom + rangeSize - 1);
+                    if (error) {
+                        console.warn('Erro ao carregar Suricato:', error);
+                        break;
+                    }
+                    if (data && data.length > 0) {
+                        suricatoData = suricatoData.concat(data);
+                    }
+                    if (!data || data.length < rangeSize) break;
+                    rangeFrom += rangeSize;
+                }
+                dadosSuricato = suricatoData;
+
+                // Carrega Feriados
+                const { data: feriadosData, error: feriadosError } = await sb.from('Feriados').select('*');
+                if (feriadosError) {
+                    console.warn('Erro ao carregar Feriados:', feriadosError);
+                    dadosFeriados = [];
+                } else {
+                    dadosFeriados = feriadosData || [];
+                }
+
+                console.log(`Suricato: ${dadosSuricato.length} registros. Feriados: ${dadosFeriados.length} registros.`);
+                console.log('Datas Suricato:', [...new Set(dadosSuricato.map(s => s.DTA))].sort());
+                console.log('Datas Feriados:', dadosFeriados.map(f => f.DTA).sort());
+
                 if (currentUser && currentUser.level > 2 && currentUser.nome) {
                     dadosHC = dadosHC.filter(c => (c['Nome do gestor'] || '').toLowerCase().includes(currentUser.nome.toLowerCase()));
                 }
@@ -415,12 +438,22 @@
             document.getElementById('dataFim').value = hoje.toISOString().split('T')[0];
         }
 
-        function status(matricula, centro, data) {
+        function status(matricula, centro, dataISO) {
+            // Verifica se é domingo (0 = domingo)
+            const diaSemana = new Date(dataISO + 'T00:00:00').getDay();
+            if (diaSemana === 0) return 'FO';
+
+            // Verifica se é feriado
+            const feriado = dadosFeriados.find(f => f.DTA === dataISO);
+            if (feriado) return 'FO';
+
+            // Se não for folga, prossegue com a lógica de presença
             if (!CENTROS.includes(centro)) return 'FA';
-            const presente = dadosSuricato.some(s => s.MATRICULA === matricula && extrairData(s.DTA_HORA) === data && estaNoTurno(centro, data, s.DTA_HORA));
+            const registros = dadosSuricato.filter(s => s.MATRICULA === matricula && s.DTA === dataISO);
+            const presente = registros.some(s => estaNoTurno(centro, dataISO, s.HR));
             if (presente) return 'P';
-            const just = dadosJust.find(j => j['MATRICULA COLAB'] === matricula && normalizarData(j.DATA) === data);
-            return just ? just.MOTIVO || 'J' : 'FA';
+            const just = dadosJust.find(j => j['MATRICULA COLAB'] === matricula && normalizarData(j.DATA) === dataISO);
+            return just ? (just.MOTIVO || 'J') : 'FA';
         }
 
         function aplicarFiltroAbs() {
@@ -442,7 +475,12 @@
                 tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
                 dias.forEach(d => {
                     const st = status(c.Matricula, c['Descrição do centro de custo'], d);
-                    tb += `<td class="${st==='P'?'cell-presente':st==='FA'?'cell-falta':'cell-justificativa'}">${st}</td>`;
+                    let classe = '';
+                    if (st === 'P') classe = 'cell-presente';
+                    else if (st === 'FA') classe = 'cell-falta';
+                    else if (st === 'FO') classe = 'cell-folga';
+                    else classe = 'cell-justificativa';
+                    tb += `<td class="${classe}">${st}</td>`;
                 });
                 tb += '</tr>';
             });
@@ -459,7 +497,11 @@
 
         function atualizarKPIsAbs(lista, dias) {
             let faltas=0, just=0;
-            lista.forEach(c => dias.forEach(d => { const s = status(c.Matricula, c['Descrição do centro de custo'], d); if (s==='FA') faltas++; else if (s!=='P') just++; }));
+            lista.forEach(c => dias.forEach(d => {
+                const s = status(c.Matricula, c['Descrição do centro de custo'], d);
+                if (s === 'FA') faltas++;
+                else if (s !== 'P' && s !== 'FO') just++;
+            }));
             document.getElementById('kpiFaltas').textContent = faltas;
             document.getElementById('kpiTaxa').textContent = lista.length ? (faltas/(lista.length*dias.length)*100).toFixed(1)+'%' : '0%';
             document.getElementById('kpiJust').textContent = just;
@@ -622,28 +664,84 @@
             const log = document.getElementById('suricatoLog'); log.textContent = 'Processando...';
             try {
                 const matriz = await lerArquivoComoMatriz(file);
-                if (matriz.length < 2) { log.textContent = 'Arquivo vazio.'; return; }
-                const dados = matriz.slice(1);
-                const registros = dados.map(linha => ({ DTA_HORA: linha[0] || '', MATRICULA: linha[4] || '' })).filter(r => r.DTA_HORA && r.MATRICULA);
-                if (!registros.length) { log.textContent = 'Nenhum registro válido.'; return; }
-                const unicos = [...new Map(registros.map(r => [r.DTA_HORA+'|'+r.MATRICULA, r])).values()];
-                log.textContent += `\nÚnicos: ${unicos.length}. Buscando existentes...`;
+                const linhas = matriz;
+                log.textContent += `\nLinhas lidas: ${linhas.length}`;
+                if (!linhas.length) { log.textContent += '\nArquivo vazio.'; return; }
+
+                const registros = [];
+                let ignoradasFaltaColuna = 0;
+                let ignoradasFormatoData = 0;
+                let primeiraData = null, ultimaData = null;
+                for (let i = 0; i < linhas.length; i++) {
+                    const linha = linhas[i];
+                    if (linha.length < 5) {
+                        ignoradasFaltaColuna++;
+                        continue;
+                    }
+                    const col0 = (linha[0] || '').trim();
+                    const col4 = (linha[4] || '').trim();
+                    if (!col0 || !col4) continue;
+
+                    const match = col0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+                    if (!match) {
+                        ignoradasFormatoData++;
+                        if (i < 5) log.textContent += `\nExemplo ignorado (formato): "${col0}"`;
+                        continue;
+                    }
+                    const [_, dd, mm, yyyy, hh, min, ss] = match;
+                    const dtaISO = `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+                    const hr = `${hh.padStart(2,'0')}:${min}:${ss || '00'}`;
+                    const matricula = col4;
+                    const key = `${matricula}_${dtaISO}`;
+                    registros.push({ DTA: dtaISO, HR: hr, MATRICULA: matricula, KEY: key });
+
+                    if (!primeiraData) primeiraData = dtaISO;
+                    ultimaData = dtaISO;
+                }
+                log.textContent += `\nRegistros válidos: ${registros.length} | Ignoradas (colunas): ${ignoradasFaltaColuna} | Ignoradas (formato): ${ignoradasFormatoData}`;
+                if (primeiraData) log.textContent += `\nPeríodo dos dados: ${primeiraData} a ${ultimaData}`;
+
+                if (!registros.length) { log.textContent += '\nNenhum registro válido para upload.'; return; }
+
+                const unicos = [...new Map(registros.map(r => [r.KEY, r])).values()];
+                log.textContent += `\nÚnicos (KEY): ${unicos.length}. Buscando existentes...`;
+
                 const existentes = new Set();
-                let from=0, size=1000;
+                let from = 0, size = 1000;
                 while (true) {
-                    const { data: batch, error } = await sb.from('SURICATO').select('DTA_HORA,MATRICULA').range(from, from+size-1);
-                    if (error) throw error;
-                    batch?.forEach(r => existentes.add(r.DTA_HORA+'|'+r.MATRICULA));
+                    const { data: batch, error } = await sb.from('SURICATO').select('KEY').range(from, from+size-1);
+                    if (error) {
+                        log.textContent += `\nErro ao buscar existentes: ${error.message}`;
+                        return;
+                    }
+                    batch?.forEach(r => existentes.add(r.KEY));
                     if (!batch || batch.length < size) break;
                     from += size;
                 }
-                const inserir = unicos.filter(r => !existentes.has(r.DTA_HORA+'|'+r.MATRICULA));
-                log.textContent += `\nNovos: ${inserir.length}.`;
-                if (!inserir.length) { log.textContent += '\n✅ Nenhum novo.'; return; }
-                for (let i=0; i<inserir.length; i+=200) await sb.from('SURICATO').insert(inserir.slice(i,i+200));
-                log.textContent += '\n✅ Upload concluído.';
+
+                const inserir = unicos.filter(r => !existentes.has(r.KEY));
+                log.textContent += `\nNovos registros: ${inserir.length}.`;
+
+                if (!inserir.length) {
+                    log.textContent += '\n✅ Nenhum registro novo para inserir.';
+                    await carregarDados();
+                    return;
+                }
+
+                for (let i = 0; i < inserir.length; i += 200) {
+                    const lote = inserir.slice(i, i+200);
+                    log.textContent += `\nEnviando lote ${Math.floor(i/200)+1} (${lote.length} registros)...`;
+                    const { error } = await sb.from('SURICATO').upsert(lote, { onConflict: 'KEY' });
+                    if (error) {
+                        log.textContent += `\n❌ Erro no upsert: ${error.message} (detalhes: ${JSON.stringify(error)})`;
+                        return;
+                    }
+                }
+                log.textContent += '\n✅ Upload concluído com sucesso.';
                 await carregarDados();
-            } catch (e) { log.textContent = '❌ '+e.message; }
+            } catch (e) {
+                log.textContent = '❌ ' + (e.message || e);
+            }
         }
         window.uploadSuricato = uploadSuricato;
 
