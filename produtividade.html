@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Headcount Manager | Produtividade</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #f3f6fa; --bg2: #e9eef5; --card: #ffffff; --sidebar: #101720; --border: #d5dde7;
+            --text: #17202a; --text2: #52606d; --muted: #8291a1;
+            --blue: #1677c8; --teal: #168f87; --amber: #d88a16; --red: #cf3f3f; --green: #138a4b;
+            --orange: #db7420; --purple: #7c4db5; --cyan: #18a4c7;
+            --shadow: 0 2px 8px rgba(15,35,55,.07); --shadow-md: 0 10px 28px rgba(15,35,55,.12);
+            --radius: 8px; --sw: 238px; --font: 'Inter', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', monospace; --transition: 0.15s ease;
+        }
+        .dark-mode {
+            --bg: #0f1119; --bg2: #1a1c2b; --card: #1e2132; --sidebar: #151724; --border: #2d3148;
+            --text: #e2e8f0; --text2: #a0aec0; --muted: #718096; --blue: #63b3ed; --teal: #4fd1c5;
+            --amber: #f6ad55; --red: #ef4444; --green: #22c55e; --orange: #f59e0b; --purple: #ce93d8;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); color: var(--text); font-family: var(--font); display: flex; min-height: 100vh; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 999; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+        .loading-overlay.show { display: flex; }
+        .spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-overlay p { color: #fff; font-family: var(--mono); font-size: 0.9rem; }
+        .login-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: #000; }
+        .login-overlay.fade-out { opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+        .login-card { width: 400px; max-width: 92%; background: rgba(15,25,60,.55); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; padding: 36px 34px; backdrop-filter: blur(18px); box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+        .login-mark { width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 18px; background: linear-gradient(135deg, #3182ce, #5ec6ff); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 18px; color: #fff; }
+        .login-title { color: #fff; font-size: 19px; font-weight: 800; text-align: center; }
+        .login-sub { color: rgba(255,255,255,.5); font-size: 12.5px; text-align: center; margin: 5px 0 26px; }
+        .login-field { margin-bottom: 14px; }
+        .login-field label { color: rgba(255,255,255,.55); font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
+        .login-field input { width: 100%; padding: 12px 14px; margin-top: 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #fff; font-size: 14.5px; outline: none; }
+        .login-btn { width:100%; margin-top:8px; padding:12px; border:0; border-radius:10px; cursor:pointer;
+            background:linear-gradient(135deg,#087bc7,#147cff,#10bfe8); color:#fff; font-weight:700; font-size:14px;
+            box-shadow:0 0 16px rgba(0,145,255,.25); transition:.2s; }
+        .login-btn:hover { transform:translateY(-1px); box-shadow:0 0 22px rgba(0,190,255,.42); }
+        .login-error { margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: rgba(214,69,69,.15); border: 1px solid rgba(214,69,69,.4); color: #ffb4b4; font-size: 12.5px; display: none; }
+        .login-error.show { display: flex; align-items: center; gap: 8px; }
+        .sidebar { width:var(--sw); background:
+            radial-gradient(circle at 20% 8%,rgba(0,212,255,.16),transparent 24%),
+            radial-gradient(circle at 90% 42%,rgba(0,120,255,.12),transparent 30%),
+            linear-gradient(180deg,#08121c 0%,#0d1b28 52%,#09141f 100%);
+            color:#dbeeff; border-right:1px solid rgba(54,181,255,.28);
+            display:flex; flex-direction:column; padding:16px 0; position:fixed; top:0; left:0; bottom:0;
+            z-index:100; box-shadow:8px 0 35px rgba(0,110,210,.13), inset -1px 0 rgba(65,205,255,.08);
+            overflow:hidden; }
+        .sidebar:before { content:""; position:absolute; height:3px; top:0; left:0; right:0;
+            background:linear-gradient(90deg,#00d9ff,#1677ff,#00f0b5,#00d9ff);
+            background-size:250% 100%; animation:neonFlow 5s linear infinite;
+            box-shadow:0 0 8px #00cfff,0 0 20px rgba(0,180,255,.65); }
+        .sidebar:after { content:""; position:absolute; width:180px; height:180px; border-radius:50%;
+            left:-90px; bottom:60px; background:rgba(0,205,255,.08); filter:blur(28px); pointer-events:none; }
+        @keyframes neonFlow { 0%{background-position:0% 50%} 100%{background-position:250% 50%} }
+        .sidebar .sidebar-header { border-bottom-color:rgba(72,170,220,.22); padding-bottom:18px; }
+        .sidebar .sidebar-header h2 { color:#f5fbff; letter-spacing:-.4px; text-shadow:0 0 12px rgba(50,190,255,.38); }
+        .sidebar .nav-item { color:#9bb6ca; border:1px solid transparent; border-radius:7px; position:relative; }
+        .sidebar .nav-item i { width:18px; text-align:center; color:#55bff0; text-shadow:0 0 7px rgba(0,190,255,.5); }
+        .sidebar .nav-item:hover { background:rgba(35,155,220,.11); color:#f5fcff; border-color:rgba(54,181,255,.18); box-shadow:0 0 16px rgba(0,150,255,.08); }
+        .sidebar .nav-item.active { background:linear-gradient(90deg,rgba(0,160,240,.25),rgba(0,100,210,.32)); color:#fff;
+            border-color:rgba(57,195,255,.38); box-shadow:inset 3px 0 #42d8ff,0 0 18px rgba(0,155,255,.13); }
+        .sidebar .nav-item.active i { color:#7be6ff; text-shadow:0 0 10px rgba(0,220,255,.85); }
+        .sidebar .sidebar-footer { border-top-color:rgba(72,170,220,.20); color:#7895aa; }
+        .sidebar .user-info { background:rgba(24,55,76,.45); border:1px solid rgba(58,178,230,.18); box-shadow:inset 0 0 18px rgba(0,130,220,.05); }
+        .sidebar .user-avatar { background:linear-gradient(135deg,#087bc5,#12c8e8); box-shadow:0 0 12px rgba(0,190,255,.45); }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+        .sidebar-header h2 { font-weight: 700; font-size: 1.25rem; }
+        .sidebar-nav { flex: 1; padding: 0 12px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; color: var(--text2); font-weight: 500; font-size: 0.92rem; cursor: pointer; transition: all var(--transition); }
+        .nav-item:hover { background: var(--bg2); }
+        .nav-item.active { background: var(--blue); color: white; }
+        .sidebar-footer { padding: 20px 20px 0; border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--muted); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: var(--bg2); padding: 10px; border-radius: 10px; }
+        .user-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff; }
+        .main-content { flex: 1; margin-left: var(--sw); padding: 20px 22px 32px; background:
+            radial-gradient(circle at 100% 0%,rgba(22,119,200,.06),transparent 28%),
+            var(--bg); }
+        .page-header { align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:24px; }
+        .page-title h1 { letter-spacing:-.7px; font-weight:800; font-size:1.9rem; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
+        .btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p>Carregando dados…</p>
+    </div>
+
+    <!-- Login overlay -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card">
+            <div class="login-mark">HM</div>
+            <div class="login-title">Headcount Manager</div>
+            <div class="login-sub">Acesso restrito</div>
+            <div class="login-field"><label>Usuário</label><input type="text" id="loginUser" placeholder="Matrícula"></div>
+            <div class="login-field"><label>Senha</label><input type="password" id="loginPass" placeholder="Senha"></div>
+            <button class="login-btn" id="loginBtn" onclick="tentarLogin()"><span>Entrar</span></button>
+            <div class="login-error" id="loginError"><span>⚠️</span><span id="loginErrorText"></span></div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header"><h2>Headcount Manager</h2></div>
+        <nav class="sidebar-nav">
+            <div class="nav-item" data-page="absenteismo"><i class="fa-solid fa-user-slash"></i> Absenteísmo</div>
+            <div class="nav-item active" data-page="produtividade"><i class="fa-solid fa-chart-line"></i> Produtividade</div>
+            <div class="nav-item" data-page="bases" id="navBases" style="display:none;"><i class="fa-solid fa-database"></i> Bases</div>
+            <div class="nav-item" data-page="usuarios" id="navUsuarios" style="display:none;"><i class="fa-solid fa-users-gear"></i> Usuários</div>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info" id="userInfo" style="display:none;">
+                <div class="user-avatar" id="userAvatar">--</div>
+                <div style="flex:1"><div id="userName">--</div><div id="userLevel" style="font-size:0.65rem;color:var(--muted);"></div></div>
+                <button class="btn ghost" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+            <div class="theme-toggle" id="themeToggle"><i class="fa-solid fa-moon"></i><span>Modo Escuro</span></div>
+            <div>Desenvolvido por <strong>Pablo Martins Lopes</strong></div>
+        </div>
+    </aside>
+
+    <!-- Conteúdo principal -->
+    <main class="main-content">
+        <div class="page-header">
+            <div class="page-title"><h1>Produtividade</h1></div>
+        </div>
+        <p style="color:var(--muted);">Módulo em desenvolvimento.</p>
+        <!-- Aqui você entrará com o desenvolvimento do módulo de produtividade -->
+    </main>
+
+    <script>
+        const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
+
+        let currentUser = null;
+
+        function showLoading() { document.getElementById('loadingOverlay').classList.add('show'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+        function aplicarUI() {
+            if (!currentUser) return;
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('userName').textContent = currentUser.nome.split(' ')[0];
+            document.getElementById('userAvatar').textContent = currentUser.nome.substring(0,2).toUpperCase();
+            const lvl = currentUser.level;
+            document.getElementById('userLevel').textContent = lvl===1?'Total':lvl===2?'RH':lvl===3?'Analista':'Visualizador';
+            document.getElementById('navBases').style.display = lvl<4?'':'none';
+            document.getElementById('navUsuarios').style.display = lvl===1?'':'none';
+        }
+
+        async function tentarLogin() {
+            const u = document.getElementById('loginUser').value.trim(), p = document.getElementById('loginPass').value;
+            if (!u || !p) return alert('Preencha campos.');
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const { data } = await sb.from('USERS').select('*').eq('Matricula', u).limit(1);
+                if (!data?.length || String(data[0].Password).trim() !== p.trim()) throw new Error('Credenciais inválidas.');
+                currentUser = { matricula: data[0].Matricula, nome: data[0].Nome || data[0].Matricula, level: Number(data[0].Level) || 4 };
+                sessionStorage.setItem('hc_user', JSON.stringify(currentUser));
+                document.getElementById('loginOverlay').classList.add('fade-out');
+                setTimeout(() => document.getElementById('loginOverlay').style.display = 'none', 500);
+                aplicarUI();
+            } catch (e) { alert(e.message); }
+            finally { btn.disabled = false; btn.innerHTML = 'Entrar'; }
+        }
+        window.tentarLogin = tentarLogin;
+
+        function logout() {
+            currentUser = null;
+            sessionStorage.removeItem('hc_user');
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('loginOverlay').classList.remove('fade-out');
+            document.getElementById('userInfo').style.display = 'none';
+        }
+
+        // Redireciona para index.html ao clicar em Absenteísmo
+        document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => {
+            const page = n.dataset.page;
+            if (page === 'absenteismo') {
+                window.location.href = 'index.html';
+            }
+            // Outros itens podem ser adicionados futuramente
+        }));
+
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const d = document.body.classList.contains('dark-mode');
+            document.getElementById('themeToggle').innerHTML = d ? '<i class="fa-solid fa-sun"></i><span>Modo Claro</span>' : '<i class="fa-solid fa-moon"></i><span>Modo Escuro</span>';
+        });
+
+        // Restaura sessão ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            const session = sessionStorage.getItem('hc_user');
+            if (session) {
+                try {
+                    currentUser = JSON.parse(session);
+                    aplicarUI();
+                    document.getElementById('loginOverlay').style.display = 'none';
+                } catch (e) {
+                    sessionStorage.removeItem('hc_user');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
