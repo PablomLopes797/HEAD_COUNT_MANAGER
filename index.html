@@ -12,13 +12,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <style>
         :root {
-            --bg: #ffffff; --bg2: #f5f7fc; --card: #ffffff; --sidebar: #ffffff; --border: #e2e8f0;
-            --text: #1a202c; --text2: #4a5568; --muted: #a0aec0;
-            --blue: #3182ce; --teal: #319795; --amber: #dd6b20; --red: #d64545; --green: #0f9d58;
-            --orange: #e5972a; --purple: #9c27b0; --shadow: 0 1px 3px rgba(0,0,0,0.04);
-            --shadow-md: 0 4px 16px rgba(0,0,0,0.06); --radius: 14px; --sw: 260px;
-            --font: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono', monospace;
-            --transition: 0.2s ease;
+            --bg: #f3f6fa; --bg2: #e9eef5; --card: #ffffff; --sidebar: #101720; --border: #d5dde7;
+            --text: #17202a; --text2: #52606d; --muted: #8291a1;
+            --blue: #1677c8; --teal: #168f87; --amber: #d88a16; --red: #cf3f3f; --green: #138a4b;
+            --orange: #db7420; --purple: #7c4db5; --cyan: #18a4c7;
+            --shadow: 0 2px 8px rgba(15,35,55,.07); --shadow-md: 0 10px 28px rgba(15,35,55,.12);
+            --radius: 8px; --sw: 238px; --font: 'Inter', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', monospace; --transition: 0.15s ease;
         }
         .dark-mode {
             --bg: #0f1119; --bg2: #1a1c2b; --card: #1e2132; --sidebar: #151724; --border: #2d3148;
@@ -36,10 +36,38 @@
         .login-field { margin-bottom: 14px; }
         .login-field label { color: rgba(255,255,255,.55); font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
         .login-field input { width: 100%; padding: 12px 14px; margin-top: 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #fff; font-size: 14.5px; outline: none; }
-        .login-btn { width: 100%; margin-top: 8px; padding: 12px; border: 0; border-radius: 10px; cursor: pointer; background: linear-gradient(135deg, #3182ce, #4472ff); color: #fff; font-weight: 700; font-size: 14px; }
+        .login-btn { width:100%; margin-top:8px; padding:12px; border:0; border-radius:10px; cursor:pointer;
+            background:linear-gradient(135deg,#087bc7,#147cff,#10bfe8); color:#fff; font-weight:700; font-size:14px;
+            box-shadow:0 0 16px rgba(0,145,255,.25); transition:.2s; }
+        .login-btn:hover { transform:translateY(-1px); box-shadow:0 0 22px rgba(0,190,255,.42); }
         .login-error { margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: rgba(214,69,69,.15); border: 1px solid rgba(214,69,69,.4); color: #ffb4b4; font-size: 12.5px; display: none; }
         .login-error.show { display: flex; align-items: center; gap: 8px; }
-        .sidebar { width: var(--sw); background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 0; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+        .sidebar { width:var(--sw); background:
+            radial-gradient(circle at 20% 8%,rgba(0,212,255,.16),transparent 24%),
+            radial-gradient(circle at 90% 42%,rgba(0,120,255,.12),transparent 30%),
+            linear-gradient(180deg,#08121c 0%,#0d1b28 52%,#09141f 100%);
+            color:#dbeeff; border-right:1px solid rgba(54,181,255,.28);
+            display:flex; flex-direction:column; padding:16px 0; position:fixed; top:0; left:0; bottom:0;
+            z-index:100; box-shadow:8px 0 35px rgba(0,110,210,.13), inset -1px 0 rgba(65,205,255,.08);
+            overflow:hidden; }
+        .sidebar:before { content:""; position:absolute; height:3px; top:0; left:0; right:0;
+            background:linear-gradient(90deg,#00d9ff,#1677ff,#00f0b5,#00d9ff);
+            background-size:250% 100%; animation:neonFlow 5s linear infinite;
+            box-shadow:0 0 8px #00cfff,0 0 20px rgba(0,180,255,.65); }
+        .sidebar:after { content:""; position:absolute; width:180px; height:180px; border-radius:50%;
+            left:-90px; bottom:60px; background:rgba(0,205,255,.08); filter:blur(28px); pointer-events:none; }
+        @keyframes neonFlow { 0%{background-position:0% 50%} 100%{background-position:250% 50%} }
+        .sidebar .sidebar-header { border-bottom-color:rgba(72,170,220,.22); padding-bottom:18px; }
+        .sidebar .sidebar-header h2 { color:#f5fbff; letter-spacing:-.4px; text-shadow:0 0 12px rgba(50,190,255,.38); }
+        .sidebar .nav-item { color:#9bb6ca; border:1px solid transparent; border-radius:7px; position:relative; }
+        .sidebar .nav-item i { width:18px; text-align:center; color:#55bff0; text-shadow:0 0 7px rgba(0,190,255,.5); }
+        .sidebar .nav-item:hover { background:rgba(35,155,220,.11); color:#f5fcff; border-color:rgba(54,181,255,.18); box-shadow:0 0 16px rgba(0,150,255,.08); }
+        .sidebar .nav-item.active { background:linear-gradient(90deg,rgba(0,160,240,.25),rgba(0,100,210,.32)); color:#fff;
+            border-color:rgba(57,195,255,.38); box-shadow:inset 3px 0 #42d8ff,0 0 18px rgba(0,155,255,.13); }
+        .sidebar .nav-item.active i { color:#7be6ff; text-shadow:0 0 10px rgba(0,220,255,.85); }
+        .sidebar .sidebar-footer { border-top-color:rgba(72,170,220,.20); color:#7895aa; }
+        .sidebar .user-info { background:rgba(24,55,76,.45); border:1px solid rgba(58,178,230,.18); box-shadow:inset 0 0 18px rgba(0,130,220,.05); }
+        .sidebar .user-avatar { background:linear-gradient(135deg,#087bc5,#12c8e8); box-shadow:0 0 12px rgba(0,190,255,.45); }
         .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
         .sidebar-header h2 { font-weight: 700; font-size: 1.25rem; }
         .sidebar-nav { flex: 1; padding: 0 12px; }
@@ -49,16 +77,23 @@
         .sidebar-footer { padding: 20px 20px 0; border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--muted); }
         .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: var(--bg2); padding: 10px; border-radius: 10px; }
         .user-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff; }
-        .main-content { flex: 1; margin-left: var(--sw); padding: 28px 32px 40px; }
+        .main-content { flex: 1; margin-left: var(--sw); padding: 20px 22px 32px; background:
+            radial-gradient(circle at 100% 0%,rgba(22,119,200,.06),transparent 28%),
+            var(--bg); }
+        .page-header { align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border); }
+        .page-title h1 { letter-spacing:-.7px; }
+        .page-title:after { content:"OPERAÇÃO • CONTROLE DE PRESENÇA"; display:block; margin-top:4px; font:600 9px var(--mono); color:var(--muted); letter-spacing:1.4px; }
         .view { display: none; }
         .view.active { display: block; }
         .page-header { display: flex; justify-content: space-between; margin-bottom: 24px; }
         .page-title h1 { font-weight: 800; font-size: 1.9rem; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
-        .kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(7,minmax(105px,1fr)); gap:8px; margin-bottom:12px; }
+        .kpi-card { background:var(--card); border:1px solid var(--border); border-radius:7px; padding:10px 12px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+        .kpi-card:before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--blue); }
+        .kpi-value { margin-top:2px; }
         .kpi-label { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); font-weight: 600; }
         .kpi-value { font-family: var(--mono); font-weight: 700; font-size: 1.6rem; }
-        .filter-bar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: center; background: var(--card); padding: 14px 18px; border-radius: var(--radius); border: 1px solid var(--border); }
+        .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; background:#fbfcfe; padding:9px 11px; border-radius:7px; border:1px solid var(--border); box-shadow:var(--shadow); }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
         .filter-group input, .filter-group select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
@@ -67,10 +102,16 @@
         .select-dropdown { position: absolute; top: 100%; left: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px; z-index: 50; min-width: 100%; display: none; max-height: 200px; overflow-y: auto; box-shadow: var(--shadow-md); }
         .multi-select.open .select-dropdown { display: block; }
         .select-dropdown label { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 0.78rem; cursor: pointer; }
-        .table-outer { border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; background: var(--card); max-height: 60vh; }
-        table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 0.75rem; }
-        th { position: sticky; top: 0; z-index: 20; background: var(--bg2); padding: 10px 6px; text-align: center; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
-        td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--border); font-family: var(--mono); font-weight: 500; }
+        .table-outer { border:1px solid #cbd5df; border-radius:7px; overflow:auto; background:var(--card); max-height:62vh; box-shadow:var(--shadow-md); }
+        table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; font-size:.70rem; }
+        th { position:sticky; top:0; z-index:20; background:#172532; padding:8px 6px; text-align:center; font-weight:700; font-size:.60rem; text-transform:uppercase; color:#d7e4ef; border-bottom:2px solid #1677c8; letter-spacing:.35px; }
+        td { padding:6px 6px; text-align:center; border-bottom:1px solid #e4e9ef; font-family:var(--mono); font-weight:600; }
+        tbody tr:hover td { background:#f1f7fb; }
+        .cell-domingo { color:#8b98a6; background:#eef1f4!important; font-weight:800; }
+        .cell-presente { background:rgba(19,138,75,.07); }
+        .cell-falta { background:rgba(207,63,63,.06); }
+        .cell-turno-noite { box-shadow:inset 0 -2px 0 rgba(22,119,200,.35); }
+        .status-tooltip { cursor:help; }
         td.sticky-col { position: sticky; z-index: 10; background: var(--card); }
         .sticky-matricula { left: 0; width: 100px; }
         .sticky-nome { left: 100px; width: 150px; font-family: var(--font); }
@@ -207,7 +248,21 @@
             const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
             return isoMatch ? str : null;
         }
-        function gerarDias(ini, fim) { const dias = []; const c = new Date(ini+'T00:00:00'); const f = new Date(fim+'T00:00:00'); while (c <= f) { dias.push(c.toISOString().split('T')[0]); c.setDate(c.getDate()+1); } return dias; }
+        function formatarISODataLocal(dt) {
+            return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        }
+        function gerarDias(ini, fim) {
+            const dias = [];
+            const [iy,im,id] = ini.split('-').map(Number);
+            const [fy,fm,fd] = fim.split('-').map(Number);
+            const c = new Date(iy,im-1,id);
+            const f = new Date(fy,fm-1,fd);
+            while (c <= f) {
+                dias.push(formatarISODataLocal(c));
+                c.setDate(c.getDate()+1);
+            }
+            return dias;
+        }
         function estaNoTurno(centro, dataStr, horaStr) {
             const t = TURNOS[centro];
             if (!t) return false;
@@ -260,21 +315,102 @@
             return MOTIVO_CODES[upper] || upper || 'J';
         }
 
+        // ============================================================
+        // REGRA DE PRESENÇA — DATA OPERACIONAL
+        // ============================================================
+        // Para os turnos I e II, o registro pertence à própria data.
+        // Para o turno III (21:00 -> 06:00):
+        //   21:00 até 23:59  => dia operacional atual
+        //   00:00 até 05:59  => dia operacional anterior
+        //
+        // Ex.: registro 17/08 22:15 => presença de 17/08
+        //      registro 18/08 02:10 => presença de 17/08
+        //      registro 18/08 06:01 => não pertence ao turno de 17/08
+        // Domingo sempre retorna "-" antes de qualquer leitura do Suricato.
+        // ============================================================
+
+        function dataAnteriorISO(dataISO) {
+            const [y,m,d] = dataISO.split('-').map(Number);
+            const dt = new Date(y, m-1, d);
+            dt.setDate(dt.getDate()-1);
+            return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        }
+
+        function horaParaMinutos(hora) {
+            if (!hora) return null;
+            const m = String(hora).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (!m) return null;
+            return Number(m[1])*60 + Number(m[2]);
+        }
+
+        function registroPertenceAoDiaOperacional(centro, registro, dataISO) {
+            if (!registro || !registro.DTA || !registro.HR) return false;
+
+            // Turno III é o único turno que atravessa a meia-noite.
+            if (centro === 'CD ARUJA - OPERACOES III') {
+                const minutos = horaParaMinutos(registro.HR);
+                if (minutos === null) return false;
+
+                // 21:00–23:59 pertence ao próprio dia.
+                if (minutos >= 21*60) {
+                    return registro.DTA === dataISO;
+                }
+
+                // 00:00–05:59 pertence ao dia anterior.
+                if (minutos < 6*60) {
+                    return registro.DTA === dataAnteriorISO(dataISO);
+                }
+
+                return false;
+            }
+
+            return registro.DTA === dataISO && estaNoTurno(centro, dataISO, registro.HR);
+        }
+
+        function registrosDoDiaOperacional(matricula, centro, dataISO) {
+            return dadosSuricato.filter(s =>
+                String(s.MATRICULA).trim() === String(matricula).trim() &&
+                registroPertenceAoDiaOperacional(centro, s, dataISO)
+            );
+        }
+
         function getStatus(matricula, centro, dataISO) {
             const diaSemana = new Date(dataISO + 'T00:00:00').getDay();
-            if (diaSemana === 0) return 'FO';
-            if (dadosFeriados.find(f => f.DTA === dataISO)) return 'FO';
+
+            // Domingo não é dia operacional na matriz.
+            if (diaSemana === 0) return '-';
+
+            // Feriados continuam como folga.
+            if (dadosFeriados.some(f => normalizarData(f.DTA || f.DATA) === dataISO)) return 'FO';
+
             if (!CENTROS.includes(centro)) return 'FA';
-            const registros = dadosSuricato.filter(s => s.MATRICULA === matricula && s.DTA === dataISO);
-            const presente = registros.some(s => estaNoTurno(centro, dataISO, s.HR));
-            if (presente) return 'P';
-            const just = dadosJust.find(j => j['MATRICULA COLAB'] === matricula && normalizarData(j.DATA) === dataISO);
+
+            // IMPORTANTE: a busca usa o DIA OPERACIONAL, não apenas DTA.
+            const registros = registrosDoDiaOperacional(matricula, centro, dataISO);
+            if (registros.length > 0) return 'P';
+
+            // Justificativa só é aplicada depois de verificar presença.
+            const just = dadosJust.find(j =>
+                String(j['MATRICULA COLAB']).trim() === String(matricula).trim() &&
+                normalizarData(j.DATA) === dataISO
+            );
+
             if (just) {
                 const motivo = normalizeMotivo(just.MOTIVO);
                 if (['AT','AF','FE','TR','AB','LI'].includes(motivo)) return motivo;
                 return just.MOTIVO || 'J';
             }
+
             return 'FA';
+        }
+
+        function getRegistrosTooltip(matricula, centro, dataISO) {
+            const regs = registrosDoDiaOperacional(matricula, centro, dataISO);
+            if (!regs.length) return '';
+            return regs
+                .sort((a,b) => String(a.HR).localeCompare(String(b.HR)))
+                .map(r => `${r.DTA} ${r.HR}`)
+                .join('\n');
         }
 
         function getSelectedValues(containerId) {
@@ -288,8 +424,9 @@
         function getTurnoAtual() {
             const agora = new Date();
             const hora = agora.getHours() * 60 + agora.getMinutes();
-            if (hora >= 300 && hora < 920) return 'CD ARUJA - OPERACOES I';
-            if (hora >= 760 && hora < 1260) return 'CD ARUJA - OPERACOES II';
+            // Janela operacional sem sobreposição.
+            if (hora >= 5*60 && hora < 12*60+40) return 'CD ARUJA - OPERACOES I';
+            if (hora >= 12*60+40 && hora < 21*60) return 'CD ARUJA - OPERACOES II';
             return 'CD ARUJA - OPERACOES III';
         }
 
@@ -350,22 +487,31 @@
             }).sort((a,b) => a.Nome.localeCompare(b.Nome,'pt-BR'));
 
             let th = '<tr><th class="sticky-col sticky-matricula">Mat</th><th class="sticky-col sticky-nome">Nome</th><th class="sticky-col sticky-cargo">Cargo</th>';
-            dias.forEach(d => { const p = d.split('-'); th += `<th>${p[2]}/${p[1]}</th>`; });
+            dias.forEach(d => {
+                const p = d.split('-');
+                const nomesDia = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+                const ds = new Date(d + 'T00:00:00').getDay();
+                const domingo = ds === 0;
+                th += `<th style="${domingo ? 'background:#29323b;color:#8f9aa5;' : ''}">${nomesDia[ds]}<br>${p[2]}/${p[1]}</th>`;
+            });
             th += '</tr>'; document.getElementById('theadAbs').innerHTML = th;
             let tb = '';
             lista.forEach(c => {
                 tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
                 dias.forEach(d => {
                     const st = getStatus(c.Matricula, c['Descrição do centro de custo'], d);
+                    const diaDomingo = new Date(d + 'T00:00:00').getDay() === 0;
+                    const tooltip = diaDomingo ? 'DOMINGO — SEM APURAÇÃO' : getRegistrosTooltip(c.Matricula, c['Descrição do centro de custo'], d);
                     let classe = 'cell-outro';
-                    if (st === 'P') classe = 'cell-presente';
+                    if (diaDomingo) classe = 'cell-domingo';
+                    else if (st === 'P') classe = 'cell-presente';
                     else if (st === 'FA') classe = 'cell-falta';
                     else if (st === 'FO') classe = 'cell-folga';
                     else if (st === 'AT') classe = 'cell-atestado';
                     else if (st === 'AF') classe = 'cell-afastamento';
                     else if (st === 'FE') classe = 'cell-ferias';
                     else if (st === 'TR') classe = 'cell-treinamento';
-                    tb += `<td class="${classe}">${st}</td>`;
+                    tb += `<td class="${classe} status-tooltip" title="${tooltip.replace(/"/g,'&quot;')}">${st}</td>`;
                 });
                 tb += '</tr>';
             });
@@ -381,7 +527,8 @@
                 const st = getStatus(c.Matricula, c['Descrição do centro de custo'], d);
                 if (st in contagem) contagem[st]++;
             }));
-            const days = dias.length || 1;
+            const diasOperacionais = dias.filter(d => new Date(d + 'T00:00:00').getDay() !== 0);
+            const days = diasOperacionais.length || 1;
             const labels = { P:'PRESENTES', FA:'FALTAS', AT:'ATESTADOS', AF:'AFASTAMENTOS', FO:'FOLGAS', FE:'FÉRIAS', TR:'TREINAMENTOS' };
             let html = '';
             for (const [cod, label] of Object.entries(labels)) {
@@ -405,7 +552,8 @@
                 const st = getStatus(c.Matricula, c['Descrição do centro de custo'], d);
                 if (st in contagemMotivo) contagemMotivo[st]++;
             }));
-            const days = dias.length || 1;
+            const diasOperacionais = dias.filter(d => new Date(d + 'T00:00:00').getDay() !== 0);
+            const days = diasOperacionais.length || 1;
             const dataMotivo = Object.values(contagemMotivo).map(v => Math.round(v / days));
 
             const ctx1 = document.getElementById('chartMotivo').getContext('2d');
@@ -559,8 +707,9 @@
                     dadosHC = dadosHC.filter(c => (c['Nome do gestor'] || '').toLowerCase().includes(currentUser.nome.toLowerCase()));
                 }
             } catch (e) { console.warn(e); }
-            document.getElementById('dataInicio').value = new Date().toISOString().split('T')[0];
-            document.getElementById('dataFim').value = new Date().toISOString().split('T')[0];
+            const hojeLocal = formatarISODataLocal(new Date());
+            document.getElementById('dataInicio').value = hojeLocal;
+            document.getElementById('dataFim').value = hojeLocal;
             initMultiSelects();
             aplicarFiltroAbs();
         }
@@ -700,17 +849,89 @@
                     return;
                 }
 
-                for (let i = 0; i < registros.length; i += 200) {
-                    const lote = registros.slice(i, i + 200);
-                    log.textContent += `\nEnviando lote ${Math.floor(i/200)+1} (${lote.length} registros)...`;
-                    const { error } = await sb.from('HC').upsert(lote, { onConflict: 'Matricula' });
+                // ============================================================
+                // SINCRONIZAÇÃO DO QUADRO HC SEM ON CONFLICT
+                // ============================================================
+                // O Supabase só aceita onConflict em uma coluna que tenha
+                // UNIQUE/PRIMARY KEY. A tabela HC atual não possui essa
+                // constraint em "Matricula", portanto o upsert falhava.
+                //
+                // Aqui fazemos a sincronização pela própria matrícula:
+                //   - matrícula já existente -> UPDATE
+                //   - matrícula nova           -> INSERT
+                //
+                // Assim não dependemos de uma constraint UNIQUE no banco.
+                // ============================================================
+
+                log.textContent += '\nVerificando matrículas já existentes no HC...';
+
+                const hcExistentes = new Map();
+                let hcFrom = 0;
+                const hcSize = 1000;
+
+                while (true) {
+                    const { data: existentes, error: erroBusca } =
+                        await sb.from('HC').select('Matricula').range(hcFrom, hcFrom + hcSize - 1);
+
+                    if (erroBusca) {
+                        log.textContent += `\n❌ Erro ao consultar HC: ${erroBusca.message}`;
+                        return;
+                    }
+
+                    (existentes || []).forEach(r => {
+                        const mat = String(r.Matricula ?? '').trim();
+                        if (mat) hcExistentes.set(mat, true);
+                    });
+
+                    if (!existentes || existentes.length < hcSize) break;
+                    hcFrom += hcSize;
+                }
+
+                const registrosExistentes = registros.filter(r =>
+                    hcExistentes.has(String(r.Matricula).trim())
+                );
+
+                const registrosNovos = registros.filter(r =>
+                    !hcExistentes.has(String(r.Matricula).trim())
+                );
+
+                log.textContent += `\nJá existentes: ${registrosExistentes.length} | Novos: ${registrosNovos.length}`;
+
+                // Atualiza registros existentes individualmente.
+                // Isso não exige UNIQUE na coluna Matricula.
+                for (let i = 0; i < registrosExistentes.length; i++) {
+                    const registro = registrosExistentes[i];
+                    const matricula = String(registro.Matricula).trim();
+
+                    const { error } = await sb
+                        .from('HC')
+                        .update(registro)
+                        .eq('Matricula', matricula);
+
                     if (error) {
-                        log.textContent += `\n❌ Erro no upsert: ${error.message}`;
+                        log.textContent += `\n❌ Erro atualizando matrícula ${matricula}: ${error.message}`;
+                        return;
+                    }
+
+                    if ((i + 1) % 25 === 0 || i === registrosExistentes.length - 1) {
+                        log.textContent += `\nAtualizados: ${i + 1}/${registrosExistentes.length}`;
+                    }
+                }
+
+                // Insere apenas matrículas que ainda não existem.
+                for (let i = 0; i < registrosNovos.length; i += 200) {
+                    const lote = registrosNovos.slice(i, i + 200);
+                    log.textContent += `\nInserindo lote ${Math.floor(i/200)+1} (${lote.length} registros)...`;
+
+                    const { error } = await sb.from('HC').insert(lote);
+
+                    if (error) {
+                        log.textContent += `\n❌ Erro no insert: ${error.message}`;
                         return;
                     }
                 }
 
-                log.textContent += '\n✅ Upload concluído com sucesso.';
+                log.textContent += `\n✅ Quadro HC sincronizado. ${registrosExistentes.length} atualizados + ${registrosNovos.length} inseridos.`;
                 await carregarDados();
             } catch (e) {
                 log.textContent += '\n❌ Erro: ' + (e.message || e);
