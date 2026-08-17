@@ -81,16 +81,25 @@
         .user-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff; }
         .main-content { flex: 1; margin-left: var(--sw); padding: 20px 22px 32px; background:
             radial-gradient(circle at 100% 0%,rgba(22,119,200,.06),transparent 28%),
-            var(--bg); }
+            var(--bg); display: flex; flex-direction: column; }
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .page-title h1 { font-weight: 800; font-size: 1.9rem; letter-spacing: -0.7px; }
         .page-title:after { content:"OPERAÇÃO • PRODUTIVIDADE"; display:block; margin-top:4px; font:600 9px var(--mono); color:var(--muted); letter-spacing:1.4px; }
         .prod-selector { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
         .prod-selector .btn { background: var(--card); color: var(--text2); border: 1px solid var(--border); }
         .prod-selector .btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
-        .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; background:var(--card); padding:9px 11px; border-radius:7px; border:1px solid var(--border); box-shadow:var(--shadow); }
-        .filter-bar label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
-        .filter-bar input, .filter-bar select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
+        .filter-bar { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; align-items:center; background:var(--card); padding:10px 12px; border-radius:7px; border:1px solid var(--border); box-shadow:var(--shadow); }
+        .filter-group { display: flex; align-items: center; gap: 8px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
+        .filter-group input, .filter-group select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
+        .metric-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; background: var(--card); padding: 10px 12px; border-radius: 7px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+        .metric-bar label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
+        .metric-bar select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
+        .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        .metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 7px; padding: 12px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+        .metric-card:before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--blue); }
+        .metric-card .metric-label { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+        .metric-card .metric-value { font-family: var(--mono); font-weight: 700; font-size: 1.5rem; margin-top: 4px; }
         .table-outer { border:1px solid #cbd5df; border-radius:7px; overflow:auto; background:var(--card); max-height:62vh; box-shadow:var(--shadow-md); }
         table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; font-size:.70rem; }
         th { position:sticky; top:0; z-index:20; background:#172532; padding:8px 6px; text-align:center; font-weight:700; font-size:.60rem; text-transform:uppercase; color:#d7e4ef; border-bottom:2px solid #1677c8; letter-spacing:.35px; }
@@ -152,17 +161,17 @@
             <button class="btn" data-op="VERTICAL" onclick="trocarOperacao('VERTICAL')">VERTICAL</button>
             <button class="btn" data-op="HORIZONTAL" onclick="trocarOperacao('HORIZONTAL')">HORIZONTAL</button>
             <button class="btn" data-op="SEPARACAO" onclick="trocarOperacao('SEPARACAO')">SEPARAÇÃO</button>
-            <button class="btn" data-op="CONFERENTE" onclick="trocarOperacao('CONFERENTE')">CONFERENTE</button>
+            <button class="btn" data-op="EXPEDICAO" onclick="trocarOperacao('EXPEDICAO')">EXPEDIÇÃO</button>
         </div>
 
-        <!-- Filtros -->
-        <div class="filter-bar">
-            <label>De:</label>
-            <input type="date" id="dataInicio" onchange="carregarDadosProd()">
-            <label>Até:</label>
-            <input type="date" id="dataFim" onchange="carregarDadosProd()">
-            <input type="text" id="filtroBusca" placeholder="Busca rápida" oninput="carregarDadosProd()" style="margin-left:8px;">
-        </div>
+        <!-- Filtros dinâmicos -->
+        <div class="filter-bar" id="filtersContainer"></div>
+
+        <!-- Seletor de métrica -->
+        <div class="metric-bar" id="metricContainer"></div>
+
+        <!-- Cards -->
+        <div class="cards-container" id="cardsContainer"></div>
 
         <!-- Tabela -->
         <div class="table-outer">
@@ -180,6 +189,83 @@
 
         let currentUser = null;
         let operacaoAtual = 'RECEBIMENTO';
+
+        const viewConfigs = {
+            RECEBIMENTO: {
+                table: 'RECEB',
+                fixedCols: ['COND_CONF', 'CONFERENTE'],
+                dateCol: 'DTA',
+                metrics: ['QTD_CARGAS'],
+                metricType: 'fixed',
+                filters: {
+                    turno: 'TURNO',
+                    turnoLabel: 'Turno',
+                    status: false,
+                    searchFields: ['COND_CONF', 'CONFERENTE']
+                },
+                extraCondition: null
+            },
+            VERTICAL: {
+                table: 'VT_HR',
+                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO'],
+                dateCol: 'DTA_PROD',
+                metrics: ['QTD_PESO', 'QTD_PLT'],
+                metricType: 'select',
+                filters: {
+                    turno: 'TURNO_PROD',
+                    turnoLabel: 'Turno',
+                    status: false,
+                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                },
+                extraCondition: { field: 'ATIVIDADE', value: 'MOV. VERTICAL' }
+            },
+            HORIZONTAL: {
+                table: 'VT_HR',
+                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO'],
+                dateCol: 'DTA_PROD',
+                metrics: ['QTD_PESO', 'QTD_PLT'],
+                metricType: 'select',
+                filters: {
+                    turno: 'TURNO_PROD',
+                    turnoLabel: 'Turno',
+                    status: false,
+                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                },
+                extraCondition: { field: 'ATIVIDADE', value: 'MOV. HORIZONTAL' }
+            },
+            SEPARACAO: {
+                table: 'PLT_FECH',
+                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO', 'LINHASEPAR'],
+                dateCol: 'DTA_INI',
+                metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
+                metricType: 'select',
+                filters: {
+                    turno: 'TURNO_FAT',
+                    turnoLabel: 'Turno Fat',
+                    turno2: 'TURNO_PROD',
+                    turno2Label: 'Turno Prod',
+                    status: true,
+                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                },
+                extraCondition: { field: 'PLTFECHADO', value: 'SEPARAÇÃO' }
+            },
+            EXPEDICAO: {
+                table: 'PLT_FECH',
+                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO', 'LINHASEPAR'],
+                dateCol: 'DTA_INI',
+                metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
+                metricType: 'select',
+                filters: {
+                    turno: 'TURNO_FAT',
+                    turnoLabel: 'Turno Fat',
+                    turno2: 'TURNO_PROD',
+                    turno2Label: 'Turno Prod',
+                    status: true,
+                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                },
+                extraCondition: { field: 'PLTFECHADO', value: 'CONFERENTE' }
+            }
+        };
 
         function showLoading() { document.getElementById('loadingOverlay').classList.add('show'); }
         function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
@@ -208,7 +294,7 @@
                 document.getElementById('loginOverlay').classList.add('fade-out');
                 setTimeout(() => document.getElementById('loginOverlay').style.display = 'none', 500);
                 aplicarUI();
-                carregarDadosProd();
+                inicializarProdutividade();
             } catch (e) { alert(e.message); }
             finally { btn.disabled = false; btn.innerHTML = 'Entrar'; }
         }
@@ -246,75 +332,254 @@
             operacaoAtual = op;
             document.querySelectorAll('.prod-selector .btn').forEach(b => b.classList.remove('active'));
             document.querySelector(`.prod-selector .btn[data-op="${op}"]`).classList.add('active');
+            construirFiltros();
+            construirMetrica();
             carregarDadosProd();
         }
         window.trocarOperacao = trocarOperacao;
 
-        function montarTabela(rows, colunas) {
-            let thead = '<tr>';
-            colunas.forEach(c => thead += `<th>${c}</th>`);
-            thead += '</tr>';
-            document.getElementById('theadProd').innerHTML = thead;
-            let tbody = '';
-            rows.forEach(r => {
-                tbody += '<tr>';
-                colunas.forEach(c => tbody += `<td>${r[c] ?? ''}</td>`);
-                tbody += '</tr>';
-            });
-            document.getElementById('tbodyProd').innerHTML = tbody || '<tr><td colspan="10">Nenhum dado encontrado.</td></tr>';
+        function construirFiltros() {
+            const config = viewConfigs[operacaoAtual];
+            const container = document.getElementById('filtersContainer');
+            let html = `
+                <div class="filter-group">
+                    <label>De:</label>
+                    <input type="date" id="dataInicio" onchange="carregarDadosProd()">
+                </div>
+                <div class="filter-group">
+                    <label>Até:</label>
+                    <input type="date" id="dataFim" onchange="carregarDadosProd()">
+                </div>
+            `;
+            if (config.filters.turno) {
+                html += `
+                <div class="filter-group">
+                    <label>${config.filters.turnoLabel || 'Turno'}</label>
+                    <select id="turnoFilter" onchange="carregarDadosProd()">
+                        <option value="">Todos</option>
+                        <option value="1_TURNO">1_TURNO</option>
+                        <option value="2_TURNO">2_TURNO</option>
+                        <option value="3_TURNO">3_TURNO</option>
+                    </select>
+                </div>`;
+            }
+            if (config.filters.turno2) {
+                html += `
+                <div class="filter-group">
+                    <label>${config.filters.turno2Label || 'Turno 2'}</label>
+                    <select id="turno2Filter" onchange="carregarDadosProd()">
+                        <option value="">Todos</option>
+                        <option value="1_TURNO">1_TURNO</option>
+                        <option value="2_TURNO">2_TURNO</option>
+                        <option value="3_TURNO">3_TURNO</option>
+                    </select>
+                </div>`;
+            }
+            if (config.filters.status) {
+                html += `
+                <div class="filter-group">
+                    <label>Status</label>
+                    <input type="text" id="statusFilter" placeholder="Status" oninput="carregarDadosProd()">
+                </div>`;
+            }
+            html += `
+                <div class="filter-group">
+                    <label>Busca</label>
+                    <input type="text" id="buscaInput" placeholder="Busca..." oninput="carregarDadosProd()" style="min-width:200px;">
+                </div>
+            `;
+            container.innerHTML = html;
+
+            // Definir datas padrão (hoje)
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('dataInicio').value = hoje;
+            document.getElementById('dataFim').value = hoje;
+        }
+
+        function construirMetrica() {
+            const config = viewConfigs[operacaoAtual];
+            const container = document.getElementById('metricContainer');
+            if (config.metricType === 'fixed') {
+                container.innerHTML = `<label>Métrica:</label><span style="font-family:var(--mono);">${config.metrics[0]}</span>`;
+            } else {
+                const options = config.metrics.map(m => `<option value="${m}">${m}</option>`).join('');
+                container.innerHTML = `<label>Métrica:</label><select id="metricSelect" onchange="carregarDadosProd()">${options}</select>`;
+            }
         }
 
         async function carregarDadosProd() {
             if (!currentUser) return;
-            const ini = document.getElementById('dataInicio').value;
-            const fim = document.getElementById('dataFim').value;
-            const busca = document.getElementById('filtroBusca').value.toLowerCase();
+            const config = viewConfigs[operacaoAtual];
+            const dateCol = config.dateCol;
+            const startDate = document.getElementById('dataInicio').value;
+            const endDate = document.getElementById('dataFim').value;
 
-            if (!ini || !fim) {
+            if (!startDate || !endDate) {
+                // Se não definido, define hoje
                 const hoje = new Date().toISOString().split('T')[0];
                 document.getElementById('dataInicio').value = hoje;
                 document.getElementById('dataFim').value = hoje;
+                return carregarDadosProd();
             }
+
+            const turnoFilter = config.filters.turno ? document.getElementById('turnoFilter')?.value : null;
+            const turno2Filter = config.filters.turno2 ? document.getElementById('turno2Filter')?.value : null;
+            const statusFilter = config.filters.status ? document.getElementById('statusFilter')?.value : null;
+            const busca = document.getElementById('buscaInput')?.value.trim().toLowerCase() || '';
+            const metric = config.metricType === 'fixed' ? config.metrics[0] : document.getElementById('metricSelect')?.value;
 
             showLoading();
             try {
-                if (operacaoAtual === 'RECEBIMENTO') {
-                    let query = sb.from('RECEB').select('*')
-                        .gte('DTA', ini || hoje).lte('DTA', fim || hoje)
-                        .order('DTA', { ascending: true });
-                    if (busca) query = query.or(`CONFERENTE.ilike.%${busca}%,COND_CONF.ilike.%${busca}%`);
-                    const { data, error } = await query.range(0, 999);
-                    if (error) throw error;
-                    montarTabela(data || [], ['DTA', 'TURNO', 'COND_CONF', 'CONFERENTE', 'QTD_CARGAS']);
-                } else if (operacaoAtual === 'VERTICAL' || operacaoAtual === 'HORIZONTAL') {
-                    const atividade = operacaoAtual === 'VERTICAL' ? 'MOV. VERTICAL' : 'MOV. HORIZONTAL';
-                    let query = sb.from('VT_HR').select('*')
-                        .eq('ATIVIDADE', atividade)
-                        .gte('DTA_PROD', ini || hoje).lte('DTA_PROD', fim || hoje)
-                        .order('DTA_PROD', { ascending: true });
-                    if (busca) query = query.or(`PRODUTIVO.ilike.%${busca}%,CODPRODUTIVO.ilike.%${busca}%`);
-                    const { data, error } = await query.range(0, 999);
-                    if (error) throw error;
-                    montarTabela(data || [], ['DTA_PROD', 'TURNO_PROD', 'CODPRODUTIVO', 'PRODUTIVO', 'ATIVIDADE', 'QTD_PESO', 'QTD_PLT']);
-                } else if (operacaoAtual === 'SEPARACAO' || operacaoAtual === 'CONFERENTE') {
-                    const pltFechado = operacaoAtual === 'SEPARACAO' ? 'SEPARAÇÃO' : 'CONFERENTE';
-                    let query = sb.from('PLT_FECH').select('*')
-                        .eq('PLTFECHADO', pltFechado)
-                        .gte('DTA_INI', ini || hoje).lte('DTA_INI', fim || hoje)
-                        .order('DTA_INI', { ascending: true });
-                    if (busca) query = query.or(`PRODUTIVO.ilike.%${busca}%,CODPRODUTIVO.ilike.%${busca}%,LINHASEPAR.ilike.%${busca}%`);
-                    const { data, error } = await query.range(0, 999);
-                    if (error) throw error;
-                    montarTabela(data || [], ['DTA_INI', 'DTA_FAT', 'TURNO_FAT', 'TURNO_PROD', 'STATUS', 'LINHASEPAR', 'CODPRODUTIVO', 'PRODUTIVO', 'PLTFECHADO', 'QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS']);
+                let query = sb.from(config.table).select('*')
+                    .gte(dateCol, startDate)
+                    .lte(dateCol, endDate);
+
+                if (config.extraCondition) {
+                    query = query.eq(config.extraCondition.field, config.extraCondition.value);
                 }
+                if (turnoFilter && turnoFilter !== '') {
+                    query = query.eq(config.filters.turno, turnoFilter);
+                }
+                if (turno2Filter && turno2Filter !== '') {
+                    query = query.eq(config.filters.turno2, turno2Filter);
+                }
+                if (statusFilter && statusFilter.trim() !== '') {
+                    query = query.eq('STATUS', statusFilter.trim());
+                }
+                if (busca) {
+                    const orParts = config.filters.searchFields.map(f => `${f}.ilike.%${busca}%`).join(',');
+                    query = query.or(orParts);
+                }
+
+                const allData = await fetchAll(query);
+                const pivot = buildPivot(allData, config.fixedCols, dateCol, metric);
+                renderTable(pivot, config.fixedCols);
+                renderCards(pivot, metric);
             } catch (e) {
                 console.error(e);
                 document.getElementById('tbodyProd').innerHTML = `<tr><td colspan="10">Erro: ${e.message}</td></tr>`;
+                document.getElementById('cardsContainer').innerHTML = '';
             } finally {
                 hideLoading();
             }
         }
         window.carregarDadosProd = carregarDadosProd;
+
+        async function fetchAll(query) {
+            let all = [];
+            let from = 0;
+            const size = 1000;
+            while (true) {
+                const { data, error } = await query.range(from, from + size - 1);
+                if (error) throw error;
+                if (data && data.length) {
+                    all = all.concat(data);
+                }
+                if (!data || data.length < size) break;
+                from += size;
+            }
+            return all;
+        }
+
+        function buildPivot(records, fixedCols, dateCol, metric) {
+            // Agrupa por chave fixa e acumula métrica por data
+            const rowsMap = new Map();
+            const allDates = new Set();
+
+            for (const rec of records) {
+                const dateValue = rec[dateCol];
+                if (!dateValue) continue;
+                const key = fixedCols.map(c => String(rec[c] ?? '')).join('|');
+                if (!rowsMap.has(key)) {
+                    const row = {};
+                    fixedCols.forEach(c => row[c] = rec[c] ?? '');
+                    row._dates = new Map();
+                    rowsMap.set(key, row);
+                }
+                const row = rowsMap.get(key);
+                const current = row._dates.get(dateValue) || 0;
+                const value = Number(rec[metric]) || 0;
+                row._dates.set(dateValue, current + value);
+                allDates.add(dateValue);
+            }
+
+            // Converte para array e ordena datas
+            const sortedDates = Array.from(allDates).sort();
+            const rows = Array.from(rowsMap.values()).map(row => {
+                const result = {};
+                fixedCols.forEach(c => result[c] = row[c]);
+                result._dates = {};
+                for (const date of sortedDates) {
+                    result._dates[date] = row._dates.get(date) || 0;
+                }
+                return result;
+            });
+            return { rows, dates: sortedDates };
+        }
+
+        function renderTable(pivot, fixedCols) {
+            const { rows, dates } = pivot;
+            let thead = '<tr>';
+            fixedCols.forEach(c => thead += `<th>${c}</th>`);
+            dates.forEach(d => {
+                const parts = d.split('-');
+                thead += `<th>${parts[2]}/${parts[1]}</th>`;
+            });
+            thead += '</tr>';
+            document.getElementById('theadProd').innerHTML = thead;
+
+            let tbody = '';
+            rows.forEach(row => {
+                tbody += '<tr>';
+                fixedCols.forEach(c => tbody += `<td>${row[c]}</td>`);
+                dates.forEach(d => {
+                    tbody += `<td>${row._dates[d] || ''}</td>`;
+                });
+                tbody += '</tr>';
+            });
+            document.getElementById('tbodyProd').innerHTML = tbody || `<tr><td colspan="${fixedCols.length + dates.length}">Nenhum dado encontrado.</td></tr>`;
+        }
+
+        function renderCards(pivot, metric) {
+            const { rows, dates } = pivot;
+            let total = 0;
+            let count = 0;
+            let min = Infinity;
+            let max = -Infinity;
+
+            rows.forEach(row => {
+                dates.forEach(d => {
+                    const val = row._dates[d];
+                    if (val !== undefined && val !== 0) {
+                        total += val;
+                        count++;
+                        if (val < min) min = val;
+                        if (val > max) max = val;
+                    }
+                });
+            });
+
+            const avg = count > 0 ? (total / count) : 0;
+            const cards = [
+                { label: 'Média', value: avg.toFixed(2) },
+                { label: 'Total', value: total },
+                { label: 'Máximo', value: max === -Infinity ? 0 : max },
+                { label: 'Mínimo', value: min === Infinity ? 0 : min }
+            ];
+
+            document.getElementById('cardsContainer').innerHTML = cards.map(c => `
+                <div class="metric-card">
+                    <div class="metric-label">${c.label}</div>
+                    <div class="metric-value">${c.value}</div>
+                </div>
+            `).join('');
+        }
+
+        function inicializarProdutividade() {
+            construirFiltros();
+            construirMetrica();
+            carregarDadosProd();
+        }
 
         // Restaura sessão
         document.addEventListener('DOMContentLoaded', () => {
@@ -324,7 +589,7 @@
                     currentUser = JSON.parse(session);
                     aplicarUI();
                     document.getElementById('loginOverlay').style.display = 'none';
-                    carregarDadosProd();
+                    inicializarProdutividade();
                 } catch (e) {
                     sessionStorage.removeItem('hc_user');
                 }
