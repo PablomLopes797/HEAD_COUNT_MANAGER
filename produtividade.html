@@ -82,8 +82,20 @@
         .main-content { flex: 1; margin-left: var(--sw); padding: 20px 22px 32px; background:
             radial-gradient(circle at 100% 0%,rgba(22,119,200,.06),transparent 28%),
             var(--bg); }
-        .page-header { align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:24px; }
-        .page-title h1 { letter-spacing:-.7px; font-weight:800; font-size:1.9rem; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .page-title h1 { font-weight: 800; font-size: 1.9rem; letter-spacing: -0.7px; }
+        .page-title:after { content:"OPERAÇÃO • PRODUTIVIDADE"; display:block; margin-top:4px; font:600 9px var(--mono); color:var(--muted); letter-spacing:1.4px; }
+        .prod-selector { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .prod-selector .btn { background: var(--card); color: var(--text2); border: 1px solid var(--border); }
+        .prod-selector .btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+        .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; background:var(--card); padding:9px 11px; border-radius:7px; border:1px solid var(--border); box-shadow:var(--shadow); }
+        .filter-bar label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
+        .filter-bar input, .filter-bar select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
+        .table-outer { border:1px solid #cbd5df; border-radius:7px; overflow:auto; background:var(--card); max-height:62vh; box-shadow:var(--shadow-md); }
+        table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; font-size:.70rem; }
+        th { position:sticky; top:0; z-index:20; background:#172532; padding:8px 6px; text-align:center; font-weight:700; font-size:.60rem; text-transform:uppercase; color:#d7e4ef; border-bottom:2px solid #1677c8; letter-spacing:.35px; }
+        td { padding:6px 6px; text-align:center; border-bottom:1px solid #e4e9ef; font-family:var(--mono); font-weight:600; }
+        tbody tr:hover td { background:#f1f7fb; }
         .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
         .btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
     </style>
@@ -114,8 +126,8 @@
         <nav class="sidebar-nav">
             <div class="nav-item" data-page="absenteismo"><i class="fa-solid fa-user-slash"></i> Absenteísmo</div>
             <div class="nav-item active" data-page="produtividade"><i class="fa-solid fa-chart-line"></i> Produtividade</div>
-            <div class="nav-item" data-page="bases" id="navBases" style="display:none;"><i class="fa-solid fa-database"></i> Bases</div>
-            <div class="nav-item" data-page="usuarios" id="navUsuarios" style="display:none;"><i class="fa-solid fa-users-gear"></i> Usuários</div>
+            <div class="nav-item" data-page="bases" id="navBases"><i class="fa-solid fa-database"></i> Bases</div>
+            <div class="nav-item" data-page="usuarios" id="navUsuarios"><i class="fa-solid fa-users-gear"></i> Usuários</div>
         </nav>
         <div class="sidebar-footer">
             <div class="user-info" id="userInfo" style="display:none;">
@@ -133,14 +145,41 @@
         <div class="page-header">
             <div class="page-title"><h1>Produtividade</h1></div>
         </div>
-        <p style="color:var(--muted);">Módulo em desenvolvimento.</p>
-        <!-- Aqui você entrará com o desenvolvimento do módulo de produtividade -->
+
+        <!-- Seletor de operação -->
+        <div class="prod-selector" id="prodSelector">
+            <button class="btn active" data-op="RECEBIMENTO" onclick="trocarOperacao('RECEBIMENTO')">RECEBIMENTO</button>
+            <button class="btn" data-op="VERTICAL" onclick="trocarOperacao('VERTICAL')">VERTICAL</button>
+            <button class="btn" data-op="HORIZONTAL" onclick="trocarOperacao('HORIZONTAL')">HORIZONTAL</button>
+            <button class="btn" data-op="SEPARACAO" onclick="trocarOperacao('SEPARACAO')">SEPARAÇÃO</button>
+            <button class="btn" data-op="CONFERENTE" onclick="trocarOperacao('CONFERENTE')">CONFERENTE</button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filter-bar">
+            <label>De:</label>
+            <input type="date" id="dataInicio" onchange="carregarDadosProd()">
+            <label>Até:</label>
+            <input type="date" id="dataFim" onchange="carregarDadosProd()">
+            <input type="text" id="filtroBusca" placeholder="Busca rápida" oninput="carregarDadosProd()" style="margin-left:8px;">
+        </div>
+
+        <!-- Tabela -->
+        <div class="table-outer">
+            <div style="max-height:60vh;">
+                <table id="tabelaProd">
+                    <thead id="theadProd"></thead>
+                    <tbody id="tbodyProd"></tbody>
+                </table>
+            </div>
+        </div>
     </main>
 
     <script>
         const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
 
         let currentUser = null;
+        let operacaoAtual = 'RECEBIMENTO';
 
         function showLoading() { document.getElementById('loadingOverlay').classList.add('show'); }
         function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
@@ -169,6 +208,7 @@
                 document.getElementById('loginOverlay').classList.add('fade-out');
                 setTimeout(() => document.getElementById('loginOverlay').style.display = 'none', 500);
                 aplicarUI();
+                carregarDadosProd();
             } catch (e) { alert(e.message); }
             finally { btn.disabled = false; btn.innerHTML = 'Entrar'; }
         }
@@ -182,13 +222,18 @@
             document.getElementById('userInfo').style.display = 'none';
         }
 
-        // Redireciona para index.html ao clicar em Absenteísmo
+        // Navegação lateral
         document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => {
             const page = n.dataset.page;
             if (page === 'absenteismo') {
-                window.location.href = 'index.html';
+                window.location.href = 'abs.html';
+            } else if (page === 'produtividade') {
+                // já está aqui
+            } else if (page === 'bases') {
+                window.location.href = 'index.html?page=bases';
+            } else if (page === 'usuarios') {
+                window.location.href = 'index.html?page=usuarios';
             }
-            // Outros itens podem ser adicionados futuramente
         }));
 
         document.getElementById('themeToggle').addEventListener('click', () => {
@@ -197,7 +242,81 @@
             document.getElementById('themeToggle').innerHTML = d ? '<i class="fa-solid fa-sun"></i><span>Modo Claro</span>' : '<i class="fa-solid fa-moon"></i><span>Modo Escuro</span>';
         });
 
-        // Restaura sessão ao carregar a página
+        function trocarOperacao(op) {
+            operacaoAtual = op;
+            document.querySelectorAll('.prod-selector .btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.prod-selector .btn[data-op="${op}"]`).classList.add('active');
+            carregarDadosProd();
+        }
+        window.trocarOperacao = trocarOperacao;
+
+        function montarTabela(rows, colunas) {
+            let thead = '<tr>';
+            colunas.forEach(c => thead += `<th>${c}</th>`);
+            thead += '</tr>';
+            document.getElementById('theadProd').innerHTML = thead;
+            let tbody = '';
+            rows.forEach(r => {
+                tbody += '<tr>';
+                colunas.forEach(c => tbody += `<td>${r[c] ?? ''}</td>`);
+                tbody += '</tr>';
+            });
+            document.getElementById('tbodyProd').innerHTML = tbody || '<tr><td colspan="10">Nenhum dado encontrado.</td></tr>';
+        }
+
+        async function carregarDadosProd() {
+            if (!currentUser) return;
+            const ini = document.getElementById('dataInicio').value;
+            const fim = document.getElementById('dataFim').value;
+            const busca = document.getElementById('filtroBusca').value.toLowerCase();
+
+            if (!ini || !fim) {
+                const hoje = new Date().toISOString().split('T')[0];
+                document.getElementById('dataInicio').value = hoje;
+                document.getElementById('dataFim').value = hoje;
+            }
+
+            showLoading();
+            try {
+                if (operacaoAtual === 'RECEBIMENTO') {
+                    let query = sb.from('RECEB').select('*')
+                        .gte('DTA', ini || hoje).lte('DTA', fim || hoje)
+                        .order('DTA', { ascending: true });
+                    if (busca) query = query.or(`CONFERENTE.ilike.%${busca}%,COND_CONF.ilike.%${busca}%`);
+                    const { data, error } = await query.range(0, 999);
+                    if (error) throw error;
+                    montarTabela(data || [], ['DTA', 'TURNO', 'COND_CONF', 'CONFERENTE', 'QTD_CARGAS']);
+                } else if (operacaoAtual === 'VERTICAL' || operacaoAtual === 'HORIZONTAL') {
+                    const atividade = operacaoAtual === 'VERTICAL' ? 'MOV. VERTICAL' : 'MOV. HORIZONTAL';
+                    let query = sb.from('VT_HR').select('*')
+                        .eq('ATIVIDADE', atividade)
+                        .gte('DTA_PROD', ini || hoje).lte('DTA_PROD', fim || hoje)
+                        .order('DTA_PROD', { ascending: true });
+                    if (busca) query = query.or(`PRODUTIVO.ilike.%${busca}%,CODPRODUTIVO.ilike.%${busca}%`);
+                    const { data, error } = await query.range(0, 999);
+                    if (error) throw error;
+                    montarTabela(data || [], ['DTA_PROD', 'TURNO_PROD', 'CODPRODUTIVO', 'PRODUTIVO', 'ATIVIDADE', 'QTD_PESO', 'QTD_PLT']);
+                } else if (operacaoAtual === 'SEPARACAO' || operacaoAtual === 'CONFERENTE') {
+                    const pltFechado = operacaoAtual === 'SEPARACAO' ? 'SEPARAÇÃO' : 'CONFERENTE';
+                    let query = sb.from('PLT_FECH').select('*')
+                        .eq('PLTFECHADO', pltFechado)
+                        .gte('DTA_INI', ini || hoje).lte('DTA_INI', fim || hoje)
+                        .order('DTA_INI', { ascending: true });
+                    if (busca) query = query.or(`PRODUTIVO.ilike.%${busca}%,CODPRODUTIVO.ilike.%${busca}%,LINHASEPAR.ilike.%${busca}%`);
+                    const { data, error } = await query.range(0, 999);
+                    if (error) throw error;
+                    montarTabela(data || [], ['DTA_INI', 'DTA_FAT', 'TURNO_FAT', 'TURNO_PROD', 'STATUS', 'LINHASEPAR', 'CODPRODUTIVO', 'PRODUTIVO', 'PLTFECHADO', 'QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS']);
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('tbodyProd').innerHTML = `<tr><td colspan="10">Erro: ${e.message}</td></tr>`;
+            } finally {
+                hideLoading();
+            }
+        }
+        window.carregarDadosProd = carregarDadosProd;
+
+        // Restaura sessão
         document.addEventListener('DOMContentLoaded', () => {
             const session = sessionStorage.getItem('hc_user');
             if (session) {
@@ -205,6 +324,7 @@
                     currentUser = JSON.parse(session);
                     aplicarUI();
                     document.getElementById('loginOverlay').style.display = 'none';
+                    carregarDadosProd();
                 } catch (e) {
                     sessionStorage.removeItem('hc_user');
                 }
