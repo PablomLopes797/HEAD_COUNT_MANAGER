@@ -209,7 +209,7 @@
         const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
         Chart.register(ChartDataLabels);
 
-        let currentUser = null, dadosHC = [], dadosSuricato = [], dadosJust = [], dadosFeriados = [];
+        let currentUser = null, dadosHC = [], dadosSuricato = [], dadosJust = [], dadosFeriados = [], dadosFerias = [];
         let chartInstances = {};
 
         const TURNOS = {
@@ -237,10 +237,19 @@
         function normalizarData(d) {
             if (!d) return null;
             let str = String(d).replace(/['"]/g, '').trim();
-            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
             if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-            return isoMatch ? str : null;
+            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            return isoMatch ? isoMatch[0] : null;
+        }
+        function pessoaEstaDeFerias(matricula, dataISO) {
+            const matriculaTexto = String(matricula ?? '').trim();
+            return dadosFerias.some(f => {
+                const matriculaFerias = String(f.MATRICULA ?? '').trim();
+                const inicio = normalizarData(f['DATA INICIO']);
+                const fim = normalizarData(f['DATA FIM']);
+                return matriculaFerias === matriculaTexto && inicio && fim && dataISO >= inicio && dataISO <= fim;
+            });
         }
         function formatarISODataLocal(dt) {
             return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -348,12 +357,17 @@
                 registroPertenceAoDiaOperacional(turno, s, dataISO)
             );
         }
-        function getStatus(matricula, turno, dataISO) {
+        function getStatus(matricula, turno, dataISO, dataAdmissao) {
+            const admissaoISO = normalizarData(dataAdmissao);
+            if (admissaoISO && dataISO < admissaoISO) return '-';
             const chave = normalizarTurno(turno);
             if (!chave || !turnoOperaNoDia(chave, dataISO)) return '-';
-            if (dadosFeriados.some(f => normalizarData(f.DTA || f.DATA) === dataISO)) return 'FO';
+
+            // 1. Presença registrada no Suricato tem prioridade.
             const registros = registrosDoDiaOperacional(matricula, chave, dataISO);
             if (registros.length > 0) return 'P';
+
+            // 2. Em seguida, verifica as justificativas cadastradas.
             const just = dadosJust.find(j =>
                 String(j['MATRICULA COLAB']).trim() === String(matricula).trim() &&
                 normalizarData(j.DATA) === dataISO
@@ -363,6 +377,14 @@
                 if (['AT','AF','FE','TR','AB','LI'].includes(motivo)) return motivo;
                 return just.MOTIVO || 'J';
             }
+
+            // 3. Depois, verifica férias pelo intervalo DATA INICIO até DATA FIM.
+            if (pessoaEstaDeFerias(matricula, dataISO)) return 'FE';
+
+            // Mantém o tratamento de feriados antes de concluir como falta.
+            if (dadosFeriados.some(f => normalizarData(f.DTA || f.DATA) === dataISO)) return 'FO';
+
+            // 4. Sem presença, justificativa ou férias, é falta.
             return 'FA';
         }
         function getRegistrosTooltip(matricula, turno, dataISO) {
@@ -444,7 +466,7 @@
             lista.forEach(c => {
                 tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
                 dias.forEach(d => {
-                    const st = getStatus(c.Matricula, c.TURNO, d);
+                    const st = getStatus(c.Matricula, c.TURNO, d, c['Data de admissão']);
                     const diaSemApuracao = !turnoOperaNoDia(c.TURNO, d);
                     const tooltip = diaSemApuracao ? 'DIA FORA DA ESCALA — SEM APURAÇÃO' : getRegistrosTooltip(c.Matricula, c.TURNO, d);
                     let classe = 'cell-outro';
@@ -468,7 +490,7 @@
         function atualizarKPIs(lista, dias) {
             const contagem = { P:0, FA:0, AT:0, AF:0, FO:0, FE:0, TR:0 };
             lista.forEach(c => dias.forEach(d => {
-                const st = getStatus(c.Matricula, c.TURNO, d);
+                const st = getStatus(c.Matricula, c.TURNO, d, c['Data de admissão']);
                 if (st in contagem) contagem[st]++;
             }));
             const totalDiasEscalados = lista.reduce((total, c) =>
@@ -494,7 +516,7 @@
             chartInstances = {};
             const contagemMotivo = { P:0, FA:0, AT:0, AF:0, FO:0, FE:0, TR:0 };
             lista.forEach(c => dias.forEach(d => {
-                const st = getStatus(c.Matricula, c.TURNO, d);
+                const st = getStatus(c.Matricula, c.TURNO, d, c['Data de admissão']);
                 if (st in contagemMotivo) contagemMotivo[st]++;
             }));
             const totalDiasEscalados = lista.reduce((total, c) =>
@@ -626,14 +648,16 @@
         async function carregarDados() {
             showLoading();
             try {
-                const [hc, jus, fer] = await Promise.all([
+                const [hc, jus, fer, ferias] = await Promise.all([
                     sb.from('HC').select('*'),
                     sb.from('Justificativas').select('*'),
-                    sb.from('Feriados').select('*')
+                    sb.from('Feriados').select('*'),
+                    sb.from('Férias').select('*')
                 ]);
                 dadosHC = (hc.data || []).filter(c => normalizarTurno(c.TURNO) !== null);
                 dadosJust = jus.data || [];
                 dadosFeriados = fer.data || [];
+                dadosFerias = ferias.data || [];
 
                 let surData = [];
                 let from = 0, size = 1000;
