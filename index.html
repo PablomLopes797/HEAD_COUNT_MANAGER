@@ -854,31 +854,31 @@
                 for (let i=0; i<linhas.length; i++) {
                     const linha = linhas[i];
                     if (linha.length < 5) continue;
-                    const col0 = (linha[0]||'').trim(), col4 = (linha[4]||'').trim();
+                    const col0 = (linha[0] || '').trim();
+                    const col4 = (linha[4] || '').trim();
                     if (!col0 || !col4) continue;
                     const match = col0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
                     if (!match) continue;
                     const [_, dd, mm, yyyy, hh, min, ss] = match;
-                    const dtaISO = `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
-                    const hr = `${hh.padStart(2,'0')}:${min}:${ss || '00'}`;
-                    const key = `${col4}_${dtaISO}`;
-                    registros.push({ DTA: dtaISO, HR: hr, MATRICULA: col4, KEY: key });
+                    const dtaISO = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    const hr = `${hh.padStart(2, '0')}:${min}:${ss || '00'}`;
+                    // Mantém todos os registros e não remove intervalos repetidos.
+                    registros.push({ DTA: dtaISO, HR: hr, MATRICULA: col4 });
                 }
-                const unicos = [...new Map(registros.map(r => [r.KEY, r])).values()];
-                const existentes = new Set();
-                let from=0, size=1000;
-                while (true) {
-                    const { data } = await sb.from('SURICATO').select('KEY').range(from, from+size-1);
-                    if (!data || !data.length) break;
-                    data.forEach(r => existentes.add(r.KEY));
-                    if (data.length < size) break;
-                    from += size;
+                if (!registros.length) {
+                    log.textContent = 'Nenhum registro válido para enviar.';
+                    return;
                 }
-                const inserir = unicos.filter(r => !existentes.has(r.KEY));
-                for (let i=0; i<inserir.length; i+=200) {
-                    await sb.from('SURICATO').upsert(inserir.slice(i,i+200), { onConflict:'KEY' });
+                for (let i = 0; i < registros.length; i += 200) {
+                    const lote = registros.slice(i, i + 200);
+                    const { error } = await sb.from('SURICATO').insert(lote);
+                    if (error) {
+                        log.textContent = `❌ Erro no insert do lote ${Math.floor(i / 200) + 1}: ${error.message}`;
+                        return;
+                    }
+                    log.textContent = `Enviados: ${Math.min(i + lote.length, registros.length)}/${registros.length}`;
                 }
-                log.textContent = `✅ ${inserir.length} novos registros inseridos.`;
+                log.textContent = `✅ ${registros.length} registros enviados para SURICATO, sem deduplicação.`;
             } catch (e) { log.textContent = '❌ '+e.message; }
         }
         window.uploadSuricato = uploadSuricato;
