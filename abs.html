@@ -212,11 +212,11 @@
         let currentUser = null, dadosHC = [], dadosSuricato = [], dadosJust = [], dadosFeriados = [];
         let chartInstances = {};
 
-        const CENTROS = ['CD ARUJA - OPERACOES I','CD ARUJA - OPERACOES II','CD ARUJA - OPERACOES III'];
         const TURNOS = {
-            'CD ARUJA - OPERACOES I': { nome: 'Manhã', ini: '05:00', fim: '15:20' },
-            'CD ARUJA - OPERACOES II': { nome: 'Tarde', ini: '12:40', fim: '23:00' },
-            'CD ARUJA - OPERACOES III': { nome: 'Noite', ini: '21:00', fim: '06:00' }
+            '1': { nome: '1 Turno', ini: '05:00', fim: '15:20', dias: [1, 2, 3, 4, 5, 6] },
+            '2': { nome: '2 Turno', ini: '12:40', fim: '23:00', dias: [1, 2, 3, 4, 5, 6] },
+            '3': { nome: '3 Turno', ini: '21:00', fim: '06:30', dias: [0, 1, 2, 3, 4, 5] },
+            '4': { nome: '4 Turno', ini: '07:00', fim: '19:00', dias: [1, 2, 3, 4, 5] }
         };
 
         function showLoading() { document.getElementById('loadingOverlay').classList.add('show'); }
@@ -257,23 +257,31 @@
             }
             return dias;
         }
-        function estaNoTurno(centro, dataStr, horaStr) {
-            const t = TURNOS[centro];
+        function normalizarTurno(valor) {
+            const numero = Number(String(valor ?? '').trim().replace(',', '.'));
+            return Number.isInteger(numero) && numero >= 1 && numero <= 4 ? String(numero) : null;
+        }
+        function turnoOperaNoDia(turno, dataISO) {
+            const chave = normalizarTurno(turno);
+            const t = TURNOS[chave];
             if (!t) return false;
-            const [y, m, d] = dataStr.split('-').map(Number);
-            const intervals = [];
-            if (t.fim === '06:00') {
-                const prevDate = new Date(y, m-1, d-1);
-                const prevY = prevDate.getFullYear(), prevM = prevDate.getMonth(), prevD = prevDate.getDate();
-                intervals.push({ ini: new Date(prevY, prevM, prevD, 21,0,0), fim: new Date(y, m-1, d, 6,0,0) });
-                intervals.push({ ini: new Date(y, m-1, d, 21,0,0), fim: new Date(y, m-1, d+1, 6,0,0) });
-            } else {
-                const [fh, fm] = t.fim.split(':').map(Number);
-                intervals.push({ ini: new Date(y, m-1, d, ...t.ini.split(':').map(Number)), fim: new Date(y, m-1, d, fh, fm, 0) });
-            }
-            const [hh, mm, ss] = horaStr.split(':').map(Number);
-            const reg = new Date(y, m-1, d, hh, mm, ss || 0);
-            return intervals.some(int => reg >= int.ini && reg <= int.fim);
+            const data = new Date(dataISO + 'T00:00:00');
+            const diaAtual = data.getDay();
+            if (chave !== '3') return t.dias.includes(diaAtual);
+            const dataAnterior = new Date(data.getTime());
+            dataAnterior.setDate(dataAnterior.getDate() - 1);
+            return t.dias.includes(diaAtual) || t.dias.includes(dataAnterior.getDay());
+        }
+        function estaNoTurno(turno, horaStr) {
+            const chave = normalizarTurno(turno);
+            const t = TURNOS[chave];
+            if (!t) return false;
+            const minutos = horaParaMinutos(horaStr);
+            if (minutos === null) return false;
+            const inicio = horaParaMinutos(t.ini);
+            const fim = horaParaMinutos(t.fim);
+            if (chave === '3') return minutos >= inicio || minutos <= fim;
+            return minutos >= inicio && minutos <= fim;
         }
         function calcularIdade(dataNascStr) {
             if (!dataNascStr) return null;
@@ -319,29 +327,32 @@
             if (!m) return null;
             return Number(m[1])*60 + Number(m[2]);
         }
-        function registroPertenceAoDiaOperacional(centro, registro, dataISO) {
+        function registroPertenceAoDiaOperacional(turno, registro, dataISO) {
             if (!registro || !registro.DTA || !registro.HR) return false;
-            if (centro === 'CD ARUJA - OPERACOES III') {
-                const minutos = horaParaMinutos(registro.HR);
-                if (minutos === null) return false;
-                if (minutos >= 21*60) return registro.DTA === dataISO;
-                if (minutos < 6*60) return registro.DTA === dataAnteriorISO(dataISO);
-                return false;
+            const chave = normalizarTurno(turno);
+            const t = TURNOS[chave];
+            const minutos = horaParaMinutos(registro.HR);
+            if (!t || minutos === null || !estaNoTurno(chave, registro.HR)) return false;
+            if (chave === '3') {
+                const dataReferencia = minutos >= 21*60 ? dataISO : dataAnteriorISO(dataISO);
+                const diaReferencia = new Date(dataReferencia + 'T00:00:00').getDay();
+                if (!t.dias.includes(diaReferencia)) return false;
+                return registro.DTA === dataReferencia;
             }
-            return registro.DTA === dataISO && estaNoTurno(centro, dataISO, registro.HR);
+            const diaSemana = new Date(dataISO + 'T00:00:00').getDay();
+            return t.dias.includes(diaSemana) && registro.DTA === dataISO;
         }
-        function registrosDoDiaOperacional(matricula, centro, dataISO) {
+        function registrosDoDiaOperacional(matricula, turno, dataISO) {
             return dadosSuricato.filter(s =>
                 String(s.MATRICULA).trim() === String(matricula).trim() &&
-                registroPertenceAoDiaOperacional(centro, s, dataISO)
+                registroPertenceAoDiaOperacional(turno, s, dataISO)
             );
         }
-        function getStatus(matricula, centro, dataISO) {
-            const diaSemana = new Date(dataISO + 'T00:00:00').getDay();
-            if (diaSemana === 0) return '-';
+        function getStatus(matricula, turno, dataISO) {
+            const chave = normalizarTurno(turno);
+            if (!chave || !turnoOperaNoDia(chave, dataISO)) return '-';
             if (dadosFeriados.some(f => normalizarData(f.DTA || f.DATA) === dataISO)) return 'FO';
-            if (!CENTROS.includes(centro)) return 'FA';
-            const registros = registrosDoDiaOperacional(matricula, centro, dataISO);
+            const registros = registrosDoDiaOperacional(matricula, chave, dataISO);
             if (registros.length > 0) return 'P';
             const just = dadosJust.find(j =>
                 String(j['MATRICULA COLAB']).trim() === String(matricula).trim() &&
@@ -354,8 +365,8 @@
             }
             return 'FA';
         }
-        function getRegistrosTooltip(matricula, centro, dataISO) {
-            const regs = registrosDoDiaOperacional(matricula, centro, dataISO);
+        function getRegistrosTooltip(matricula, turno, dataISO) {
+            const regs = registrosDoDiaOperacional(matricula, turno, dataISO);
             if (!regs.length) return '';
             return regs
                 .sort((a,b) => String(a.HR).localeCompare(String(b.HR)))
@@ -369,14 +380,6 @@
             return Array.from(checks).map(cb => cb.value);
         }
         function toggleDropdown(msId) { document.getElementById(msId).classList.toggle('open'); }
-        function getTurnoAtual() {
-            const agora = new Date();
-            const hora = agora.getHours() * 60 + agora.getMinutes();
-            if (hora >= 5*60 && hora < 12*60+40) return 'CD ARUJA - OPERACOES I';
-            if (hora >= 12*60+40 && hora < 21*60) return 'CD ARUJA - OPERACOES II';
-            return 'CD ARUJA - OPERACOES III';
-        }
-
         // ========== FILTRO E TABELA ==========
         function aplicarFiltroAbs() {
             const ini = document.getElementById('dataInicio').value, fim = document.getElementById('dataFim').value;
@@ -401,14 +404,12 @@
             const turnosSel = getSelectedValues('turnoOptions');
             const motivosSel = getSelectedValues('motivoOptions');
             const faixasSel = getSelectedValues('faixaEtariaOptions');
-            const turnoPadrao = turnosSel.length === 0 ? getTurnoAtual() : null;
             let lista = dadosHC.filter(c => {
                 if (busca && !c.Matricula.toLowerCase().includes(busca) && !c.Nome.toLowerCase().includes(busca)) return false;
                 if (cargosSel.length && !cargosSel.includes(c['Descrição do cargo'] || '')) return false;
-                const centro = c['Descrição do centro de custo'] || '';
-                const turno = TURNOS[centro]?.nome || '';
-                if (turnosSel.length && !turnosSel.includes(turno)) return false;
-                if (turnoPadrao && TURNOS[centro]?.nome !== TURNOS[turnoPadrao]?.nome) return false;
+                const turno = normalizarTurno(c.TURNO);
+                const turnoNome = TURNOS[turno]?.nome || '';
+                if (turnosSel.length && !turnosSel.includes(turnoNome)) return false;
                 const idade = c.Idade ? parseInt(c.Idade) : null;
                 if (faixasSel.length && idade !== null) {
                     let ok = false;
@@ -443,11 +444,11 @@
             lista.forEach(c => {
                 tb += `<tr><td class="sticky-col sticky-matricula">${c.Matricula}</td><td class="sticky-col sticky-nome">${c.Nome}</td><td class="sticky-col sticky-cargo">${c['Descrição do cargo']||''}</td>`;
                 dias.forEach(d => {
-                    const st = getStatus(c.Matricula, c['Descrição do centro de custo'], d);
-                    const diaDomingo = new Date(d + 'T00:00:00').getDay() === 0;
-                    const tooltip = diaDomingo ? 'DOMINGO — SEM APURAÇÃO' : getRegistrosTooltip(c.Matricula, c['Descrição do centro de custo'], d);
+                    const st = getStatus(c.Matricula, c.TURNO, d);
+                    const diaSemApuracao = !turnoOperaNoDia(c.TURNO, d);
+                    const tooltip = diaSemApuracao ? 'DIA FORA DA ESCALA — SEM APURAÇÃO' : getRegistrosTooltip(c.Matricula, c.TURNO, d);
                     let classe = 'cell-outro';
-                    if (diaDomingo) classe = 'cell-domingo';
+                    if (diaSemApuracao) classe = 'cell-domingo';
                     else if (st === 'P') classe = 'cell-presente';
                     else if (st === 'FA') classe = 'cell-falta';
                     else if (st === 'FO') classe = 'cell-folga';
@@ -467,11 +468,13 @@
         function atualizarKPIs(lista, dias) {
             const contagem = { P:0, FA:0, AT:0, AF:0, FO:0, FE:0, TR:0 };
             lista.forEach(c => dias.forEach(d => {
-                const st = getStatus(c.Matricula, c['Descrição do centro de custo'], d);
+                const st = getStatus(c.Matricula, c.TURNO, d);
                 if (st in contagem) contagem[st]++;
             }));
-            const diasOperacionais = dias.filter(d => new Date(d + 'T00:00:00').getDay() !== 0);
-            const days = diasOperacionais.length || 1;
+            const totalDiasEscalados = lista.reduce((total, c) =>
+                total + dias.filter(d => turnoOperaNoDia(c.TURNO, d)).length, 0
+            );
+            const days = totalDiasEscalados / Math.max(lista.length, 1) || 1;
             const labels = { P:'PRESENTES', FA:'FALTAS', AT:'ATESTADOS', AF:'AFASTAMENTOS', FO:'FOLGAS', FE:'FÉRIAS', TR:'TREINAMENTOS' };
             let html = '';
             for (const [cod, label] of Object.entries(labels)) {
@@ -491,11 +494,13 @@
             chartInstances = {};
             const contagemMotivo = { P:0, FA:0, AT:0, AF:0, FO:0, FE:0, TR:0 };
             lista.forEach(c => dias.forEach(d => {
-                const st = getStatus(c.Matricula, c['Descrição do centro de custo'], d);
+                const st = getStatus(c.Matricula, c.TURNO, d);
                 if (st in contagemMotivo) contagemMotivo[st]++;
             }));
-            const diasOperacionais = dias.filter(d => new Date(d + 'T00:00:00').getDay() !== 0);
-            const days = diasOperacionais.length || 1;
+            const totalDiasEscalados = lista.reduce((total, c) =>
+                total + dias.filter(d => turnoOperaNoDia(c.TURNO, d)).length, 0
+            );
+            const days = totalDiasEscalados / Math.max(lista.length, 1) || 1;
             const dataMotivo = Object.values(contagemMotivo).map(v => Math.round(v / days));
             const ctx1 = document.getElementById('chartMotivo').getContext('2d');
             chartInstances.chartMotivo = new Chart(ctx1, {
@@ -515,7 +520,7 @@
                     else if (tempo <= 10) faixa = '6-10';
                     else if (tempo <= 15) faixa = '11-15';
                 }
-                dias.forEach(d => { faixasTempo[faixa]++; });
+                dias.filter(d => turnoOperaNoDia(c.TURNO, d)).forEach(() => { faixasTempo[faixa]++; });
             });
             const ctx2 = document.getElementById('chartTempoCasa').getContext('2d');
             chartInstances.chartTempoCasa = new Chart(ctx2, {
@@ -539,7 +544,7 @@
                     else if (idade <= 90) faixa = '81-90';
                     else if (idade <= 100) faixa = '91-100';
                 }
-                dias.forEach(d => { faixasIdade[faixa]++; });
+                dias.filter(d => turnoOperaNoDia(c.TURNO, d)).forEach(() => { faixasIdade[faixa]++; });
             });
             const ctx3 = document.getElementById('chartFaixaEtaria').getContext('2d');
             chartInstances.chartFaixaEtaria = new Chart(ctx3, {
@@ -626,7 +631,7 @@
                     sb.from('Justificativas').select('*'),
                     sb.from('Feriados').select('*')
                 ]);
-                dadosHC = (hc.data || []).filter(c => CENTROS.includes(c['Descrição do centro de custo'] || ''));
+                dadosHC = (hc.data || []).filter(c => normalizarTurno(c.TURNO) !== null);
                 dadosJust = jus.data || [];
                 dadosFeriados = fer.data || [];
 
