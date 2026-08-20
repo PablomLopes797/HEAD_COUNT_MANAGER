@@ -267,7 +267,7 @@
     </div>
 
     <script>
-        const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
+        const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'sb_publishable_scc1UJAUVN-m0dk1NFpR-A_9LmNzHsF');
 
         let currentUser = null;
 
@@ -546,15 +546,89 @@
             const meses = totalMeses % 12;
             return `${anos} ano(s) e ${meses} mes(es)`;
         }
-        function detectDelim(linha) { let melhor=','; let max=0; [',',';','\t','|'].forEach(d => { const n = linha.split(d).length; if (n>max) { max=n; melhor=d; } }); return melhor; }
+        function normalizarCampoTXT(valor) {
+            return String(valor ?? '')
+                .replace(/^\uFEFF/, '')
+                .replace(/\u0000/g, '')
+                .trim()
+                .replace(/^"([\s\S]*)"$/, '$1')
+                .replace(/""/g, '"')
+                .trim();
+        }
+
+        function normalizarCabecalhoTXT(valor) {
+            return normalizarCampoTXT(valor)
+                .toUpperCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[\s-]+/g, '_');
+        }
+
+        function contarDelimitadoresForaDeAspas(linha, delimitador) {
+            let dentroDeAspas = false;
+            let quantidade = 0;
+            for (let i = 0; i < linha.length; i++) {
+                const caractere = linha[i];
+                if (caractere === '"') {
+                    if (dentroDeAspas && linha[i + 1] === '"') {
+                        i++;
+                    } else {
+                        dentroDeAspas = !dentroDeAspas;
+                    }
+                } else if (caractere === delimitador && !dentroDeAspas) {
+                    quantidade++;
+                }
+            }
+            return quantidade;
+        }
+
+        function detectDelim(linha) {
+            // O REC_NEW usa ponto e vírgula. Ele fica como padrão e também vence empates.
+            const candidatos = [';', ',', '\t', '|'];
+            let melhor = ';';
+            let max = 0;
+            candidatos.forEach(delimitador => {
+                const quantidade = contarDelimitadoresForaDeAspas(linha, delimitador);
+                if (quantidade > max) {
+                    max = quantidade;
+                    melhor = delimitador;
+                }
+            });
+            return melhor;
+        }
+
+        function separarLinhaTXT(linha, delimitador) {
+            const valores = [];
+            let atual = '';
+            let dentroDeAspas = false;
+            for (let i = 0; i < linha.length; i++) {
+                const caractere = linha[i];
+                if (caractere === '"') {
+                    if (dentroDeAspas && linha[i + 1] === '"') {
+                        atual += '"';
+                        i++;
+                    } else {
+                        dentroDeAspas = !dentroDeAspas;
+                    }
+                } else if (caractere === delimitador && !dentroDeAspas) {
+                    valores.push(normalizarCampoTXT(atual));
+                    atual = '';
+                } else {
+                    atual += caractere;
+                }
+            }
+            valores.push(normalizarCampoTXT(atual));
+            return valores;
+        }
+
         async function lerArquivoComoMatriz(file) {
             const nome = file.name.toLowerCase();
             if (nome.endsWith('.csv') || nome.endsWith('.txt')) {
                 const text = await file.text();
-                const linhas = text.split(/\r?\n/).filter(l => l.trim());
+                const linhas = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
                 if (!linhas.length) return [];
                 const delim = detectDelim(linhas[0]);
-                return linhas.map(l => l.split(delim).map(v => limparValor(v)));
+                return linhas.map(l => separarLinhaTXT(l, delim));
             } else {
                 const buf = await file.arrayBuffer();
                 const wb = XLSX.read(buf, { type:'array' });
@@ -562,57 +636,192 @@
                 return data.filter(row => row.some(cell => cell !== '')).map(row => row.map(cell => limparValor(cell)));
             }
         }
-        async function lerArquivoTXT(file) { return await file.text(); }
-        function parseTXT(text) {
-            const linhas = text.split(/\r?\n/).filter(l => l.trim());
+
+        function detectarCodificacaoTXT(bytes) {
+            if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return 'utf-8';
+            if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) return 'utf-16le';
+            if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) return 'utf-16be';
+
+            const amostra = bytes.subarray(0, Math.min(bytes.length, 12000));
+            let nulosPares = 0, nulosImpares = 0;
+            for (let i = 0; i < amostra.length; i++) {
+                if (amostra[i] === 0) {
+                    if (i % 2 === 0) nulosPares++;
+                    else nulosImpares++;
+                }
+            }
+            if (nulosImpares > 8 && nulosImpares > nulosPares * 2) return 'utf-16le';
+            if (nulosPares > 8 && nulosPares > nulosImpares * 2) return 'utf-16be';
+            return 'utf-8';
+        }
+
+        async function lerArquivoTXT(file) {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            const codificacao = detectarCodificacaoTXT(bytes);
+            let texto = new TextDecoder(codificacao, { fatal: false }).decode(bytes);
+            if (codificacao === 'utf-8' && (texto.includes('\uFFFD') || texto.includes('\u0000'))) {
+                try { texto = new TextDecoder('windows-1252', { fatal: false }).decode(bytes); } catch (_) {}
+            }
+            return texto.replace(/^\uFEFF/, '').replace(/\u0000/g, '');
+        }
+
+        const COLUNAS_REC_ORDEM = [
+            'CARGA', 'DESCRICAO', 'COND_CONF', 'CONFERENTE',
+            'PORTARIA_DATA', 'PORTARIA_HORA', 'GEROUCARGA_DATA', 'GEROUCARGA_HORA',
+            'INICIOCONF_DATA', 'INICIOCONF_HORA', 'FINALCONF_DATA', 'FINALCONF_HORA',
+            'TERMOLIB_DATA', 'TERMOLIB_HORA', 'QTDE_CXS'
+        ];
+
+        function parseTXT(text, colunasEsperadas = [], cabecalhoFallback = []) {
+            const linhas = String(text ?? '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
             if (linhas.length === 0) return [];
-            const delimiter = detectDelim(linhas[0]);
-            const headers = linhas[0].split(delimiter).map(h => h.trim());
+
+            let indiceCabecalho = 0;
+            let delimiter = detectDelim(linhas[0]);
+            let headers = separarLinhaTXT(linhas[0], delimiter).map(normalizarCabecalhoTXT);
+
+            // Alguns exports trazem título, data de geração ou filtros antes do cabeçalho.
+            // No REC_NEW, encontre a linha que contém as colunas obrigatórias.
+            if (colunasEsperadas.length > 0) {
+                const esperadas = colunasEsperadas.map(c => normalizarCabecalhoTXT(c).replace(/_/g, ''));
+                const limiteBusca = Math.min(linhas.length, 50);
+                let encontrado = false;
+                for (let i = 0; i < limiteBusca; i++) {
+                    const delimAtual = detectDelim(linhas[i]);
+                    const headersAtuais = separarLinhaTXT(linhas[i], delimAtual).map(normalizarCabecalhoTXT);
+                    const compactos = headersAtuais.map(h => h.replace(/_/g, ''));
+                    if (esperadas.every(coluna => compactos.includes(coluna))) {
+                        indiceCabecalho = i;
+                        delimiter = delimAtual;
+                        headers = headersAtuais;
+                        encontrado = true;
+                        break;
+                    }
+                }
+                if (!encontrado) {
+                    // Alguns REC_CONF_V3 são exportados sem a linha de cabeçalho ou com o cabeçalho ilegível.
+                    // Nesse caso, usa-se a ordem definida pela Query e começa na primeira linha que tem data/hora de início.
+                    if (!cabecalhoFallback.length) return [];
+                    const delimitadorFallback = ';';
+                    let primeiraLinhaDados = -1;
+                    for (let i = 0; i < linhas.length; i++) {
+                        const valores = separarLinhaTXT(linhas[i], delimitadorFallback);
+                        if (valores.length < cabecalhoFallback.length) continue;
+                        const dataCandidata = parseDataBr(valores[8]);
+                        const horaCandidata = parseHora(valores[9]);
+                        if (dataCandidata && horaCandidata !== null) {
+                            primeiraLinhaDados = i;
+                            delimiter = delimitadorFallback;
+                            headers = cabecalhoFallback.map(normalizarCabecalhoTXT);
+                            indiceCabecalho = i - 1;
+                            encontrado = true;
+                            break;
+                        }
+                    }
+                    if (!encontrado || primeiraLinhaDados < 0) return [];
+                }
+            }
+
             const rows = [];
-            for (let i = 1; i < linhas.length; i++) {
-                const valores = linhas[i].split(delimiter).map(v => v.trim());
-                if (valores.length < headers.length) continue;
+            for (let i = indiceCabecalho + 1; i < linhas.length; i++) {
+                const valores = separarLinhaTXT(linhas[i], delimiter);
+                // O Power Query preenche colunas ausentes com null; aqui fazemos o mesmo com string vazia.
+                // Uma linha totalmente sem separadores continua sendo ignorada quando o arquivo possui várias colunas.
+                if (headers.length > 1 && valores.length === 1 && !valores[0]) continue;
                 const obj = {};
-                headers.forEach((h, idx) => { obj[h] = valores[idx]; });
+                headers.forEach((h, idx) => {
+                    if (h) obj[h] = valores[idx] ?? '';
+                });
                 rows.push(obj);
             }
             return rows;
         }
-        function parseDataBr(dataStr) {
-            if (!dataStr) return null;
-            const str = String(dataStr).trim();
-            const br = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-            if (br) {
-                const [_, d, m, y] = br;
-                return new Date(y, m-1, d);
-            }
-            const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-            if (iso) {
-                const [_, y, m, d] = iso;
-                return new Date(y, m-1, d);
-            }
-            return null;
+        function criarDataSegura(ano, mes, dia) {
+            const y = Number(ano), m = Number(mes), d = Number(dia);
+            if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+            const data = new Date(y, m - 1, d);
+            return data.getFullYear() === y && data.getMonth() === m - 1 && data.getDate() === d ? data : null;
         }
+
+        function parseDataBr(dataStr) {
+            if (dataStr === null || dataStr === undefined) return null;
+            const str = normalizarCampoTXT(dataStr);
+            if (!str) return null;
+
+            // Também aceita número serial de data, caso o TXT tenha sido exportado como número.
+            if (/^\d+(?:[.,]\d+)?$/.test(str)) {
+                const serial = Number(str.replace(',', '.'));
+                if (serial >= 1 && serial < 100000) {
+                    const data = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * 86400000));
+                    return criarDataSegura(data.getUTCFullYear(), data.getUTCMonth() + 1, data.getUTCDate());
+                }
+            }
+
+            // Aceita datas produzidas pelo Power Query e exports em dd/MM/yyyy, dd.MM.yyyy ou ISO.
+            const compacta = str.match(/^(\d{4})(\d{2})(\d{2})(?:\s|$)/);
+            if (compacta) return criarDataSegura(compacta[1], compacta[2], compacta[3]);
+            const iso = str.match(/^(\d{4})[-](\d{1,2})[-](\d{1,2})(?:[T\s]|$)/);
+            if (iso) return criarDataSegura(iso[1], iso[2], iso[3]);
+
+            const local = str.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[T\s]|$)/);
+            if (!local) return null;
+            let dia = Number(local[1]);
+            let mes = Number(local[2]);
+            const ano = Number(local[3]);
+
+            // Se o arquivo vier em mm/dd/yyyy, a troca é segura apenas quando o segundo campo > 12.
+            if (mes > 12 && dia <= 12) [dia, mes] = [mes, dia];
+            return criarDataSegura(ano, mes, dia);
+        }
+
         function parseHora(horaStr) {
-            if (!horaStr) return null;
-            const str = String(horaStr).trim().replace('.', ':');
-            const m = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (horaStr === null || horaStr === undefined) return null;
+            const original = normalizarCampoTXT(horaStr);
+            if (!original) return null;
+            const numero = Number(original.replace(',', '.'));
+            if (Number.isFinite(numero) && numero >= 0 && numero < 1 && /[.,]/.test(original)) {
+                return Math.round(numero * 24 * 60) % (24 * 60);
+            }
+            const str = original.replace(/[.,]/g, ':');
+            let m = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (!m && /^\d{6}$/.test(str)) m = str.match(/^(\d{2})(\d{2})(\d{2})$/);
+            if (!m && /^\d{4}$/.test(str)) m = str.match(/^(\d{2})(\d{2})$/);
             if (!m) return null;
-            return Number(m[1])*60 + Number(m[2]);
+            const horas = Number(m[1]);
+            const minutos = Number(m[2]);
+            if (horas > 23 || minutos > 59) return null;
+            return horas * 60 + minutos;
+        }
+
+        function parseInteiroPowerQuery(valor) {
+            const str = normalizarCampoTXT(valor);
+            if (!str) return null;
+            const somenteNumero = str.replace(/\s/g, '').replace(/\.(?=\d{3}(?:\D|$))/g, '').replace(',', '.');
+            const numero = Number(somenteNumero);
+            return Number.isFinite(numero) ? Math.trunc(numero) : null;
         }
         function formatarDataISO(date) {
             return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
         }
 
         // ========== PROCESSAMENTO DAS BASES ==========
+        function obterCampoRec(row, nome) {
+            const alvo = normalizarCabecalhoTXT(nome).replace(/_/g, '');
+            const chave = Object.keys(row).find(campo => normalizarCabecalhoTXT(campo).replace(/_/g, '') === alvo);
+            return chave === undefined ? '' : normalizarCampoTXT(row[chave]);
+        }
+
         function processarDadosRecNew(rows) {
             const registros = [];
             for (const row of rows) {
-                const dataStr = row['INICIOCONF_DATA'];
-                const horaStr = row['INICIOCONF_HORA'];
+                const dataStr = obterCampoRec(row, 'INICIOCONF_DATA');
+                const horaStr = obterCampoRec(row, 'INICIOCONF_HORA');
                 if (!dataStr || !horaStr) continue;
                 const data = parseDataBr(dataStr);
                 const minutos = parseHora(horaStr);
+                const carga = parseInteiroPowerQuery(obterCampoRec(row, 'CARGA'));
+                const condConf = parseInteiroPowerQuery(obterCampoRec(row, 'COND_CONF'));
                 if (!data || minutos === null) continue;
                 const turno = minutos < 6*60 ? '3_TURNO' :
                               minutos < 14*60+20 ? '1_TURNO' :
@@ -621,9 +830,9 @@
                 registros.push({
                     DTA: formatarDataISO(dta),
                     TURNO: turno,
-                    COND_CONF: row['COND_CONF'] || '',
-                    CONFERENTE: row['CONFERENTE'] || '',
-                    CARGA: row['CARGA'] || ''
+                    COND_CONF: condConf,
+                    CONFERENTE: obterCampoRec(row, 'CONFERENTE'),
+                    CARGA: carga
                 });
             }
             const distinctMap = new Map();
@@ -716,8 +925,11 @@
                 const codProdutivo = row['CODPRODUTIVO'] || '';
                 const produtivo = row['PRODUTIVO'] || '';
                 const qtdEmb = parseFloat(row['QTDEMBCONTADA']?.replace(',', '.')) || 0;
-                const pltFechadoRaw = row['PLTFECHADO'] || '';
-                const pltFechado = pltFechadoRaw === 'NÃO' ? 'SEPARAÇÃO' : (pltFechadoRaw === 'SIM' ? 'CONFERENTE' : pltFechadoRaw);
+                const pltFechadoRaw = String(row['PLTFECHADO'] || '').trim();
+                const pltFechadoMaiusculo = pltFechadoRaw.toUpperCase();
+                const pltFechado = ['NÃO', 'NAO', 'N�O'].includes(pltFechadoMaiusculo)
+                    ? 'SEPARAÇÃO'
+                    : (pltFechadoMaiusculo === 'SIM' ? 'CONFERENTE' : pltFechadoRaw);
 
                 const dataIni = parseDataBr(dtaIni.substring(0,10));
                 const horaIni = parseHora(dtaIni.substring(11,16).replace('.', ':'));
@@ -1121,7 +1333,11 @@
             for (const file of arquivos) {
                 try {
                     const text = await lerArquivoTXT(file);
-                    const rows = parseTXT(text);
+                    const rows = parseTXT(
+                        text,
+                        ['INICIOCONF_DATA', 'INICIOCONF_HORA'],
+                        COLUNAS_REC_ORDEM
+                    );
                     registrosLidos += rows.length;
                     const processados = processarDadosRecNew(rows);
                     registrosValidos += processados.length;
@@ -1133,7 +1349,7 @@
             }
             if (todos.length === 0) { log.textContent += '\nNenhum registro válido para sincronizar.'; return; }
             showLoading();
-            const resultado = await sincronizarTabela('RECEB', ['DTA', 'TURNO', 'COND_CONF', 'CONFERENTE'], todos, log);
+            const resultado = await sincronizarTabela('RECEB.', ['DTA', 'TURNO', 'COND_CONF', 'CONFERENTE'], todos, log);
             hideLoading();
             log.textContent += `\n\nResumo:`;
             log.textContent += `\nArquivos encontrados: ${arquivos.length}`;
