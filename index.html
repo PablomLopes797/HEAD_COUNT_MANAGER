@@ -625,7 +625,7 @@
             const nome = file.name.toLowerCase();
             if (nome.endsWith('.csv') || nome.endsWith('.txt')) {
                 const text = await file.text();
-                const linhas = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
+                const linhas = text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter(l => l.trim());
                 if (!linhas.length) return [];
                 const delim = detectDelim(linhas[0]);
                 return linhas.map(l => separarLinhaTXT(l, delim));
@@ -674,7 +674,7 @@
         ];
 
         function parseTXT(text, colunasEsperadas = [], cabecalhoFallback = []) {
-            const linhas = String(text ?? '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
+            const linhas = String(text ?? '').replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter(l => l.trim());
             if (linhas.length === 0) return [];
 
             let indiceCabecalho = 0;
@@ -746,11 +746,14 @@
 
         function parseDataBr(dataStr) {
             if (dataStr === null || dataStr === undefined) return null;
-            const str = normalizarCampoTXT(dataStr);
+            let str = normalizarCampoTXT(dataStr)
+                .replace(/[\u200B-\u200D\u2060\u00A0]/g, ' ')
+                .replace(/^date\s*[:=]\s*/i, '')
+                .trim();
             if (!str) return null;
 
-            // Também aceita número serial de data, caso o TXT tenha sido exportado como número.
-            if (/^\d+(?:[.,]\d+)?$/.test(str)) {
+            // Datas numéricas do Excel/Power Query, como 45292 ou 45292,0.
+            if (/^\d{1,6}(?:[.,]\d+)?$/.test(str)) {
                 const serial = Number(str.replace(',', '.'));
                 if (serial >= 1 && serial < 100000) {
                     const data = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * 86400000));
@@ -758,21 +761,39 @@
                 }
             }
 
-            // Aceita datas produzidas pelo Power Query e exports em dd/MM/yyyy, dd.MM.yyyy ou ISO.
-            const compacta = str.match(/^(\d{4})(\d{2})(\d{2})(?:\s|$)/);
-            if (compacta) return criarDataSegura(compacta[1], compacta[2], compacta[3]);
-            const iso = str.match(/^(\d{4})[-](\d{1,2})[-](\d{1,2})(?:[T\s]|$)/);
-            if (iso) return criarDataSegura(iso[1], iso[2], iso[3]);
+            // Formato compacto yyyyMMdd, inclusive quando exportado como yyyyMMdd.0.
+            const compacta = str.match(/^(\d{4})(\d{2})(\d{2})(?:[.,]\d+)?(?:[T\s]|$)/);
+            if (compacta) {
+                const dataCompacta = criarDataSegura(compacta[1], compacta[2], compacta[3]);
+                if (dataCompacta) return dataCompacta;
+            }
+            const compactaDMY = str.match(/^(\d{2})(\d{2})(\d{4})(?:\d{2,6})?$/);
+            if (compactaDMY) return criarDataSegura(compactaDMY[3], compactaDMY[2], compactaDMY[1]);
 
-            const local = str.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[T\s]|$)/);
-            if (!local) return null;
-            let dia = Number(local[1]);
-            let mes = Number(local[2]);
-            const ano = Number(local[3]);
+            // Formatos ano-mês-dia: yyyy-MM-dd, yyyy/MM/dd e yyyy.MM.dd, com ou sem horário.
+            const anoMesDia = str.match(/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})(?:[T\s.,]|$)/);
+            if (anoMesDia) return criarDataSegura(anoMesDia[1], anoMesDia[2], anoMesDia[3]);
 
-            // Se o arquivo vier em mm/dd/yyyy, a troca é segura apenas quando o segundo campo > 12.
-            if (mes > 12 && dia <= 12) [dia, mes] = [mes, dia];
-            return criarDataSegura(ano, mes, dia);
+            // Formatos dia-mês-ano: dd/MM/yyyy, dd-MM-yyyy e dd.MM.yyyy, com ou sem horário.
+            const diaMesAno = str.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2}|\d{4})(?:[T\s.,]|$)/);
+            if (diaMesAno) {
+                let dia = Number(diaMesAno[1]);
+                let mes = Number(diaMesAno[2]);
+                const anoBruto = Number(diaMesAno[3]);
+                const ano = anoBruto < 100 ? 2000 + anoBruto : anoBruto;
+                if (mes > 12 && dia <= 12) [dia, mes] = [mes, dia];
+                return criarDataSegura(ano, mes, dia);
+            }
+
+            // Último fallback: procura uma data completa no meio do texto exportado.
+            const dentroAnoMesDia = str.match(/(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/);
+            if (dentroAnoMesDia) return criarDataSegura(dentroAnoMesDia[1], dentroAnoMesDia[2], dentroAnoMesDia[3]);
+            const dentroDiaMesAno = str.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2}|\d{4})/);
+            if (dentroDiaMesAno) {
+                const anoBruto = Number(dentroDiaMesAno[3]);
+                return criarDataSegura(anoBruto < 100 ? 2000 + anoBruto : anoBruto, dentroDiaMesAno[2], dentroDiaMesAno[1]);
+            }
+            return null;
         }
 
         function parseHora(horaStr) {
@@ -812,17 +833,21 @@
             return chave === undefined ? '' : normalizarCampoTXT(row[chave]);
         }
 
-        function processarDadosRecNew(rows) {
+        function processarDadosRecNew(rows, diagnostico = null) {
             const registros = [];
+            const diag = diagnostico || { semData: 0, semHora: 0, dataInvalida: 0, horaInvalida: 0, aceitos: 0 };
             for (const row of rows) {
                 const dataStr = obterCampoRec(row, 'INICIOCONF_DATA');
                 const horaStr = obterCampoRec(row, 'INICIOCONF_HORA');
-                if (!dataStr || !horaStr) continue;
+                if (!dataStr) { diag.semData++; continue; }
+                if (!horaStr) { diag.semHora++; continue; }
                 const data = parseDataBr(dataStr);
                 const minutos = parseHora(horaStr);
                 const carga = parseInteiroPowerQuery(obterCampoRec(row, 'CARGA'));
                 const condConf = parseInteiroPowerQuery(obterCampoRec(row, 'COND_CONF'));
-                if (!data || minutos === null) continue;
+                if (!data) { diag.dataInvalida++; continue; }
+                if (minutos === null) { diag.horaInvalida++; continue; }
+                diag.aceitos++;
                 const turno = minutos < 6*60 ? '3_TURNO' :
                               minutos < 14*60+20 ? '1_TURNO' :
                               minutos < 22*60 ? '2_TURNO' : '3_TURNO';
@@ -927,7 +952,7 @@
                 const qtdEmb = parseFloat(row['QTDEMBCONTADA']?.replace(',', '.')) || 0;
                 const pltFechadoRaw = String(row['PLTFECHADO'] || '').trim();
                 const pltFechadoMaiusculo = pltFechadoRaw.toUpperCase();
-                const pltFechado = ['NÃO', 'NAO', 'N�O'].includes(pltFechadoMaiusculo)
+                const pltFechado = ['NÃO', 'NAO', 'N O'].includes(pltFechadoMaiusculo)
                     ? 'SEPARAÇÃO'
                     : (pltFechadoMaiusculo === 'SIM' ? 'CONFERENTE' : pltFechadoRaw);
 
@@ -1330,6 +1355,7 @@
             let registrosLidos = 0;
             let registrosValidos = 0;
             const todos = [];
+            const diagnosticoTotal = { semData: 0, semHora: 0, dataInvalida: 0, horaInvalida: 0, aceitos: 0 };
             for (const file of arquivos) {
                 try {
                     const text = await lerArquivoTXT(file);
@@ -1339,15 +1365,30 @@
                         COLUNAS_REC_ORDEM
                     );
                     registrosLidos += rows.length;
-                    const processados = processarDadosRecNew(rows);
+                    const diagnosticoArquivo = { semData: 0, semHora: 0, dataInvalida: 0, horaInvalida: 0, aceitos: 0 };
+                    const processados = processarDadosRecNew(rows, diagnosticoArquivo);
+                    Object.keys(diagnosticoTotal).forEach(k => diagnosticoTotal[k] += diagnosticoArquivo[k]);
                     registrosValidos += processados.length;
                     todos.push(...processados);
-                    log.textContent += `\n✔ ${file.name}: ${processados.length} registros válidos`;
+                    log.textContent += `\n✔ ${file.name}: ${processados.length} registros válidos | linhas lidas: ${rows.length}`;
+                    if (rows.length === 0) log.textContent += ' | parser não encontrou linhas com o cabeçalho/ordem REC';
+                    else if (processados.length === 0) {
+                        const primeira = rows[0] || {};
+                        const colunasDetectadas = Object.keys(primeira).join(',');
+                        const dataBruta = obterCampoRec(primeira, 'INICIOCONF_DATA');
+                        const horaBruta = obterCampoRec(primeira, 'INICIOCONF_HORA');
+                        log.textContent += ` | sem data: ${diagnosticoArquivo.semData}, sem hora: ${diagnosticoArquivo.semHora}, data inválida: ${diagnosticoArquivo.dataInvalida}, hora inválida: ${diagnosticoArquivo.horaInvalida}`;
+                        log.textContent += ` | colunas: ${colunasDetectadas} | data bruta: [${dataBruta}] | hora bruta: [${horaBruta}]`;
+                    }
                 } catch (e) {
                     log.textContent += `\n❌ Erro no arquivo ${file.name}: ${e.message}`;
                 }
             }
-            if (todos.length === 0) { log.textContent += '\nNenhum registro válido para sincronizar.'; return; }
+            if (todos.length === 0) {
+                log.textContent += `\n\nDiagnóstico total: linhas lidas ${registrosLidos}; sem data ${diagnosticoTotal.semData}; sem hora ${diagnosticoTotal.semHora}; data inválida ${diagnosticoTotal.dataInvalida}; hora inválida ${diagnosticoTotal.horaInvalida}.`;
+                log.textContent += '\nNenhum registro válido para sincronizar.';
+                return;
+            }
             showLoading();
             const resultado = await sincronizarTabela('RECEB.', ['DTA', 'TURNO', 'COND_CONF', 'CONFERENTE'], todos, log);
             hideLoading();
