@@ -185,15 +185,16 @@
     </main>
 
     <script>
-        const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2cmZldGpocXh2eG9yenl0cGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDc5NzksImV4cCI6MjEwMTUyMzk3OX0.Di7fxD4moTBjWlkzlZ2TNpszo4fz96kAzsBY0cialFA');
+        const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'sb_publishable_scc1UJAUVN-m0dk1NFpR-A_9LmNzHsF');
 
         let currentUser = null;
         let operacaoAtual = 'RECEBIMENTO';
 
         const viewConfigs = {
             RECEBIMENTO: {
-                table: 'RECEB',
-                fixedCols: ['COND_CONF', 'CONFERENTE'],
+                table: 'RECEB.',
+                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
+                personFields: { matricula: 'COND_CONF', nome: 'CONFERENTE' },
                 dateCol: 'DTA',
                 metrics: ['QTD_CARGAS'],
                 metricType: 'fixed',
@@ -201,13 +202,15 @@
                     turno: 'TURNO',
                     turnoLabel: 'Turno',
                     status: false,
-                    searchFields: ['COND_CONF', 'CONFERENTE']
+                    searchFields: ['CONFERENTE'],
+                    numericSearchFields: ['COND_CONF']
                 },
                 extraCondition: null
             },
             VERTICAL: {
                 table: 'VT_HR',
-                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO'],
+                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
+                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_PROD',
                 metrics: ['QTD_PESO', 'QTD_PLT'],
                 metricType: 'select',
@@ -215,13 +218,15 @@
                     turno: 'TURNO_PROD',
                     turnoLabel: 'Turno',
                     status: false,
-                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                    searchFields: ['PRODUTIVO'],
+                    numericSearchFields: ['CODPRODUTIVO']
                 },
                 extraCondition: { field: 'ATIVIDADE', value: 'MOV. VERTICAL' }
             },
             HORIZONTAL: {
                 table: 'VT_HR',
-                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO'],
+                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
+                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_PROD',
                 metrics: ['QTD_PESO', 'QTD_PLT'],
                 metricType: 'select',
@@ -229,13 +234,15 @@
                     turno: 'TURNO_PROD',
                     turnoLabel: 'Turno',
                     status: false,
-                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                    searchFields: ['PRODUTIVO'],
+                    numericSearchFields: ['CODPRODUTIVO']
                 },
                 extraCondition: { field: 'ATIVIDADE', value: 'MOV. HORIZONTAL' }
             },
             SEPARACAO: {
                 table: 'PLT_FECH',
-                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO', 'LINHASEPAR'],
+                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
+                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_INI',
                 metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
                 metricType: 'select',
@@ -245,13 +252,15 @@
                     turno2: 'TURNO_PROD',
                     turno2Label: 'Turno Prod',
                     status: true,
-                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                    searchFields: ['PRODUTIVO'],
+                    numericSearchFields: ['CODPRODUTIVO']
                 },
-                extraCondition: { field: 'PLTFECHADO', value: 'SEPARAÇÃO' }
+                extraCondition: { field: 'PLTFECHADO', values: ['SEPARAÇÃO', 'NÃO', 'NAO', 'N O'] }
             },
             EXPEDICAO: {
                 table: 'PLT_FECH',
-                fixedCols: ['CODPRODUTIVO', 'PRODUTIVO', 'LINHASEPAR'],
+                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
+                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_INI',
                 metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
                 metricType: 'select',
@@ -261,7 +270,8 @@
                     turno2: 'TURNO_PROD',
                     turno2Label: 'Turno Prod',
                     status: true,
-                    searchFields: ['CODPRODUTIVO', 'PRODUTIVO']
+                    searchFields: ['PRODUTIVO'],
+                    numericSearchFields: ['CODPRODUTIVO']
                 },
                 extraCondition: { field: 'PLTFECHADO', value: 'CONFERENTE' }
             }
@@ -407,6 +417,56 @@
             }
         }
 
+        function normalizarMatricula(valor) {
+            const texto = String(valor ?? '').trim();
+            if (!texto) return '';
+            return /^\d+$/.test(texto) ? String(Number(texto)) : texto.toUpperCase();
+        }
+
+        function formatarDataLocal(data) {
+            return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
+        }
+
+        function gerarDatasDoPeriodo(inicio, fim) {
+            const datas = [];
+            const atual = new Date(`${inicio}T00:00:00`);
+            const limite = new Date(`${fim}T00:00:00`);
+            while (atual <= limite) {
+                datas.push(formatarDataLocal(atual));
+                atual.setDate(atual.getDate() + 1);
+            }
+            return datas;
+        }
+
+        async function carregarMapaColaboradores() {
+            const mapa = new Map();
+            try {
+                const registrosHC = await fetchAll(sb.from('HC').select('*'));
+                (registrosHC || []).forEach(reg => {
+                    const matricula = reg.Matricula ?? reg.MATRICULA ?? reg.CODPRODUTIVO;
+                    const chave = normalizarMatricula(matricula);
+                    if (chave) mapa.set(chave, reg);
+                });
+            } catch (e) {
+                console.warn('Não foi possível carregar o cadastro HC para complementar cargo:', e.message);
+            }
+            return mapa;
+        }
+
+        function valorColaborador(registro, config, mapaHC) {
+            const matriculaOrigem = registro[config.personFields.matricula];
+            const chaveMatricula = normalizarMatricula(matriculaOrigem);
+            const cadastro = mapaHC.get(chaveMatricula) || {};
+            const nome = registro[config.personFields.nome] || cadastro.Nome || cadastro.NOME || '';
+            const cargo = cadastro['Descrição do cargo'] || cadastro.CARGO || cadastro.Cargo || cadastro['DESCRICAO CARGO'] || registro.CARGO || '';
+            return {
+                matricula: matriculaOrigem ?? '',
+                nome,
+                cargo,
+                chave: chaveMatricula || String(nome).trim().toUpperCase()
+            };
+        }
+
         async function carregarDadosProd() {
             if (!currentUser) return;
             const config = viewConfigs[operacaoAtual];
@@ -420,11 +480,15 @@
                 document.getElementById('dataFim').value = hoje;
                 return carregarDadosProd();
             }
+            if (startDate > endDate) {
+                document.getElementById('tbodyProd').innerHTML = '<tr><td colspan="20">O período inicial não pode ser maior que o período final.</td></tr>';
+                return;
+            }
 
             const turnoFilter = config.filters.turno ? document.getElementById('turnoFilter')?.value : null;
             const turno2Filter = config.filters.turno2 ? document.getElementById('turno2Filter')?.value : null;
             const statusFilter = config.filters.status ? document.getElementById('statusFilter')?.value : null;
-            const busca = document.getElementById('buscaInput')?.value.trim().toLowerCase() || '';
+            const busca = document.getElementById('buscaInput')?.value.trim() || '';
             const metric = config.metricType === 'fixed' ? config.metrics[0] : document.getElementById('metricSelect')?.value;
 
             showLoading();
@@ -434,29 +498,31 @@
                     .lte(dateCol, endDate);
 
                 if (config.extraCondition) {
-                    query = query.eq(config.extraCondition.field, config.extraCondition.value);
+                    query = config.extraCondition.values
+                        ? query.in(config.extraCondition.field, config.extraCondition.values)
+                        : query.eq(config.extraCondition.field, config.extraCondition.value);
                 }
-                if (turnoFilter && turnoFilter !== '') {
-                    query = query.eq(config.filters.turno, turnoFilter);
-                }
-                if (turno2Filter && turno2Filter !== '') {
-                    query = query.eq(config.filters.turno2, turno2Filter);
-                }
-                if (statusFilter && statusFilter.trim() !== '') {
-                    query = query.eq('STATUS', statusFilter.trim());
-                }
+                if (turnoFilter) query = query.eq(config.filters.turno, turnoFilter);
+                if (turno2Filter) query = query.eq(config.filters.turno2, turno2Filter);
+                if (statusFilter && statusFilter.trim() !== '') query = query.eq('STATUS', statusFilter.trim());
+
                 if (busca) {
-                    const orParts = config.filters.searchFields.map(f => `${f}.ilike.%${busca}%`).join(',');
-                    query = query.or(orParts);
+                    const buscaSegura = busca.replace(/[(),]/g, ' ').trim();
+                    const partesTexto = (config.filters.searchFields || []).map(f => `${f}.ilike.%${buscaSegura}%`);
+                    const partesNumericas = /^\d+$/.test(buscaSegura)
+                        ? (config.filters.numericSearchFields || []).map(f => `${f}.eq.${buscaSegura}`)
+                        : [];
+                    const orParts = [...partesTexto, ...partesNumericas].join(',');
+                    if (orParts) query = query.or(orParts);
                 }
 
-                const allData = await fetchAll(query);
-                const pivot = buildPivot(allData, config.fixedCols, dateCol, metric);
+                const [allData, mapaHC] = await Promise.all([fetchAll(query), carregarMapaColaboradores()]);
+                const pivot = buildPivot(allData, config, metric, startDate, endDate, mapaHC);
                 renderTable(pivot, config.fixedCols);
                 renderCards(pivot, metric);
             } catch (e) {
                 console.error(e);
-                document.getElementById('tbodyProd').innerHTML = `<tr><td colspan="10">Erro: ${e.message}</td></tr>`;
+                document.getElementById('tbodyProd').innerHTML = `<tr><td colspan="20">Erro ao consultar o Supabase: ${e.message}</td></tr>`;
                 document.getElementById('cardsContainer').innerHTML = '';
             } finally {
                 hideLoading();
@@ -480,44 +546,48 @@
             return all;
         }
 
-        function buildPivot(records, fixedCols, dateCol, metric) {
+        function buildPivot(records, config, metric, startDate, endDate, mapaHC) {
             const rowsMap = new Map();
-            const allDates = new Set();
+            const sortedDates = gerarDatasDoPeriodo(startDate, endDate);
+            const datasPermitidas = new Set(sortedDates);
 
             for (const rec of records) {
-                const dateValue = rec[dateCol];
-                if (!dateValue) continue;
-                const key = fixedCols.map(c => String(rec[c] ?? '')).join('|');
-                if (!rowsMap.has(key)) {
-                    const row = {};
-                    fixedCols.forEach(c => row[c] = rec[c] ?? '');
-                    row._dates = new Map();
-                    rowsMap.set(key, row);
+                const dateValue = String(rec[config.dateCol] ?? '').slice(0, 10);
+                if (!datasPermitidas.has(dateValue)) continue;
+
+                const pessoa = valorColaborador(rec, config, mapaHC);
+                if (!pessoa.chave) continue;
+                if (!rowsMap.has(pessoa.chave)) {
+                    rowsMap.set(pessoa.chave, {
+                        MATRICULA: pessoa.matricula,
+                        NOME: pessoa.nome,
+                        CARGO: pessoa.cargo,
+                        _dates: new Map()
+                    });
                 }
-                const row = rowsMap.get(key);
-                const current = row._dates.get(dateValue) || 0;
-                const value = Number(rec[metric]) || 0;
-                row._dates.set(dateValue, current + value);
-                allDates.add(dateValue);
+                const row = rowsMap.get(pessoa.chave);
+                if (!row.NOME && pessoa.nome) row.NOME = pessoa.nome;
+                if (!row.CARGO && pessoa.cargo) row.CARGO = pessoa.cargo;
+                const atual = row._dates.get(dateValue) || 0;
+                const valor = Number(rec[metric]);
+                row._dates.set(dateValue, atual + (Number.isFinite(valor) ? valor : 0));
             }
 
-            const sortedDates = Array.from(allDates).sort();
-            const rows = Array.from(rowsMap.values()).map(row => {
-                const result = {};
-                fixedCols.forEach(c => result[c] = row[c]);
-                result._dates = {};
-                for (const date of sortedDates) {
-                    result._dates[date] = row._dates.get(date) || 0;
-                }
-                return result;
-            });
+            const rows = Array.from(rowsMap.values())
+                .sort((a, b) => String(a.NOME || '').localeCompare(String(b.NOME || ''), 'pt-BR'))
+                .map(row => {
+                    const result = { MATRICULA: row.MATRICULA, NOME: row.NOME, CARGO: row.CARGO, _dates: {} };
+                    sortedDates.forEach(date => { result._dates[date] = row._dates.get(date) || 0; });
+                    return result;
+                });
             return { rows, dates: sortedDates };
         }
 
         function renderTable(pivot, fixedCols) {
             const { rows, dates } = pivot;
+            const nomesColunas = { MATRICULA: 'MATRÍCULA', NOME: 'NOME', CARGO: 'CARGO' };
             let thead = '<tr>';
-            fixedCols.forEach(c => thead += `<th>${c}</th>`);
+            fixedCols.forEach(c => thead += `<th>${nomesColunas[c] || c}</th>`);
             dates.forEach(d => {
                 const parts = d.split('-');
                 thead += `<th>${parts[2]}/${parts[1]}</th>`;
