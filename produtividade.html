@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Headcount Manager | Produtividade</title>
+    <title>Headcount Manager | Painel Principal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
             --bg: #f3f6fa; --bg2: #e9eef5; --card: #ffffff; --sidebar: #101720; --border: #d5dde7;
@@ -52,6 +53,18 @@
             display:flex; flex-direction:column; padding:16px 0; position:fixed; top:0; left:0; bottom:0;
             z-index:100; box-shadow:8px 0 35px rgba(0,110,210,.13), inset -1px 0 rgba(65,205,255,.08);
             overflow:hidden; }
+        .particle-canvas { position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; opacity:.9; }
+        .sidebar > .sidebar-header, .sidebar > .sidebar-nav, .sidebar > .sidebar-footer { position:relative; z-index:1; }
+        .theme-toggle { display:flex; align-items:center; gap:10px; padding:10px 11px; margin-bottom:13px; border:1px solid rgba(89,199,239,.18); border-radius:12px; background:rgba(19,58,82,.42); color:#d9f5ff; cursor:pointer; user-select:none; transition:background .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+        .theme-toggle:hover, .theme-toggle:focus-visible { background:rgba(24,93,125,.55); border-color:rgba(106,224,255,.45); box-shadow:0 0 18px rgba(0,190,255,.15); outline:none; transform:translateY(-1px); }
+        .theme-toggle > i { width:20px; text-align:center; color:#7be6ff; text-shadow:0 0 9px rgba(0,215,255,.7); }
+        .theme-copy { display:flex; flex-direction:column; gap:1px; line-height:1.05; }
+        .theme-copy strong { font-size:.72rem; letter-spacing:.2px; }
+        .theme-copy small { font-size:.59rem; opacity:.62; }
+        .theme-switch { width:35px; height:20px; padding:2px; margin-left:auto; border-radius:999px; background:rgba(121,211,241,.26); border:1px solid rgba(139,225,255,.34); transition:background .2s ease; }
+        .theme-switch span { display:block; width:14px; height:14px; border-radius:50%; background:#a9edff; box-shadow:0 0 8px rgba(101,224,255,.7); transition:transform .2s ease, background .2s ease; }
+        .dark-mode .theme-switch { background:rgba(89,117,255,.55); }
+        .dark-mode .theme-switch span { transform:translateX(15px); background:#fff; box-shadow:0 0 9px rgba(145,161,255,.9); }
         .sidebar:before { content:""; position:absolute; height:3px; top:0; left:0; right:0;
             background:linear-gradient(90deg,#00d9ff,#1677ff,#00f0b5,#00d9ff);
             background-size:250% 100%; animation:neonFlow 5s linear infinite;
@@ -82,33 +95,37 @@
         .main-content { flex: 1; margin-left: var(--sw); padding: 20px 22px 32px; background:
             radial-gradient(circle at 100% 0%,rgba(22,119,200,.06),transparent 28%),
             var(--bg); display: flex; flex-direction: column; }
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .page-title h1 { font-weight: 800; font-size: 1.9rem; letter-spacing: -0.7px; }
-        .page-title:after { content:"OPERAÇÃO • PRODUTIVIDADE"; display:block; margin-top:4px; font:600 9px var(--mono); color:var(--muted); letter-spacing:1.4px; }
-        .prod-selector { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-        .prod-selector .btn { background: var(--card); color: var(--text2); border: 1px solid var(--border); }
-        .prod-selector .btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
-        .filter-bar { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; align-items:center; background:var(--card); padding:10px 12px; border-radius:7px; border:1px solid var(--border); box-shadow:var(--shadow); }
-        .filter-group { display: flex; align-items: center; gap: 8px; }
-        .filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
-        .filter-group input, .filter-group select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
-        .metric-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; background: var(--card); padding: 10px 12px; border-radius: 7px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-        .metric-bar label { font-size: 0.75rem; font-weight: 600; color: var(--text2); }
-        .metric-bar select { background: var(--bg2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-family: var(--mono); color: var(--text); font-size: 0.82rem; outline: none; }
-        .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
-        .metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 7px; padding: 12px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
-        .metric-card:before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--blue); }
-        .metric-card .metric-label { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); font-weight: 600; }
-        .metric-card .metric-value { font-family: var(--mono); font-weight: 700; font-size: 1.5rem; margin-top: 4px; }
-        .table-outer { border:1px solid #cbd5df; border-radius:7px; overflow:auto; background:var(--card); max-height:62vh; box-shadow:var(--shadow-md); }
-        table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; font-size:.70rem; }
-        th { position:sticky; top:0; z-index:20; background:#172532; padding:8px 6px; text-align:center; font-weight:700; font-size:.60rem; text-transform:uppercase; color:#d7e4ef; border-bottom:2px solid #1677c8; letter-spacing:.35px; }
-        td { padding:6px 6px; text-align:center; border-bottom:1px solid #e4e9ef; font-family:var(--mono); font-weight:600; }
-        tbody tr:hover td { background:#f1f7fb; }
-        .meta-atingida { background:#b7e4c7 !important; color:#14532d; font-weight:800; }
-        .dark-mode .meta-atingida { background:#86efac !important; color:#064e3b; }
-        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
-        .btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+        .view { display: none; flex: 1; }
+        .view.active { display: flex; flex-direction: column; }
+        .view#view-home { position: relative; overflow: hidden; min-height: calc(100vh - 52px); border:1px solid rgba(86,183,225,.18); border-radius:18px; background:#07131f; box-shadow:0 18px 60px rgba(0,30,70,.18); }
+        .view#view-home::after { content:""; position:absolute; inset:0; z-index:1; background:linear-gradient(115deg,rgba(2,12,25,.88) 0%,rgba(2,20,36,.48) 45%,rgba(0,7,18,.72) 100%), radial-gradient(circle at 72% 30%,rgba(0,189,255,.18),transparent 36%); pointer-events:none; }
+        .view#view-home video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; filter:saturate(1.18) contrast(1.06) brightness(.76); transform:scale(1.02); }
+        .view#view-home .home-overlay { position:relative; z-index:2; display:flex; align-items:flex-start; justify-content:center; height:100%; min-height:calc(100vh - 52px); padding:clamp(40px,10vh,110px) clamp(28px,8vw,110px); flex-direction:column; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.82); }
+        .home-kicker { display:flex; align-items:center; gap:9px; margin-bottom:16px; font:700 .68rem var(--mono); letter-spacing:2.4px; color:#86e9ff; text-shadow:0 0 12px rgba(0,208,255,.55); }
+        .home-kicker span { width:8px; height:8px; border-radius:50%; background:#5ff4d0; box-shadow:0 0 12px #5ff4d0; animation:pulseDot 1.8s ease-in-out infinite; }
+        @keyframes pulseDot { 0%,100%{opacity:.55;transform:scale(.8)} 50%{opacity:1;transform:scale(1.15)} }
+        .home-overlay h1 { max-width:850px; font-size:clamp(3.3rem,8vw,7.2rem); line-height:.95; font-weight:900; letter-spacing:-.07em; }
+        .home-overlay h1 span { color:#7eeaff; background:linear-gradient(105deg,#fff 0%,#8beeff 48%,#7c9dff 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+        .home-overlay p { max-width:570px; margin-top:22px; font-size:clamp(1rem,1.8vw,1.3rem); line-height:1.55; color:rgba(239,251,255,.82); text-shadow:0 2px 9px rgba(0,0,0,.7); }
+        .home-hint { display:flex; align-items:center; gap:9px; margin-top:32px; padding:10px 14px; border:1px solid rgba(145,224,255,.3); border-radius:999px; background:rgba(6,45,69,.42); color:#bdefff; font:600 .76rem var(--mono); letter-spacing:.15px; backdrop-filter:blur(8px); }
+        .home-hint i { color:#76eaff; }
+        .page-header h1 { font-weight:800; font-size:1.9rem; }
+        .btn { padding:9px 16px; border-radius:10px; font-weight:700; border:1px solid rgba(255,255,255,.08); cursor:pointer; background:linear-gradient(135deg,#087bc7,#147cff 58%,#10bfe8); color:white; display:inline-flex; align-items:center; gap:7px; box-shadow:0 8px 18px rgba(0,119,214,.18); transition:transform .18s ease, box-shadow .18s ease, filter .18s ease; }
+        .btn:hover { transform:translateY(-1px); filter:saturate(1.12); box-shadow:0 11px 24px rgba(0,119,214,.28); }
+        .btn.ghost { background:transparent; color:var(--text2); border:1px solid var(--border); box-shadow:none; }
+        .kpi-card { background:linear-gradient(145deg,var(--card),color-mix(in srgb,var(--card) 88%,var(--blue))); border:1px solid var(--border); border-radius:12px; padding:15px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden; margin-bottom:12px; }
+        .kpi-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg,#16c5ff,#716bff); }
+        .kpi-card h4 { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:.94rem; }
+        .kpi-card h4 i { color:var(--blue); }
+        .panel-hint { margin:-4px 0 10px; color:var(--muted); font-size:.72rem; }
+        .kpi-card input[type="file"] { max-width:100%; padding:8px; border:1px dashed var(--border); border-radius:9px; background:rgba(117,161,193,.07); color:var(--text2); }
+        .sync-log { font-family:var(--mono); font-size:.75rem; color:var(--text2); white-space:pre-wrap; margin-top:10px; }
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+        table { width:100%; border-collapse:collapse; font-size:.85rem; }
+        th { background: #172532; color: #d7e4ef; padding: 8px; text-transform: uppercase; font-size: 0.7rem; }
+        td { padding: 8px; border-bottom: 1px solid var(--border); text-align: center; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
     </style>
 </head>
 <body>
@@ -133,10 +150,11 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
+        <canvas id="particleCanvas" class="particle-canvas" aria-hidden="true"></canvas>
         <div class="sidebar-header"><h2>Headcount Manager</h2></div>
         <nav class="sidebar-nav">
             <div class="nav-item" data-page="absenteismo"><i class="fa-solid fa-user-slash"></i> Absenteísmo</div>
-            <div class="nav-item active" data-page="produtividade"><i class="fa-solid fa-chart-line"></i> Produtividade</div>
+            <div class="nav-item" data-page="produtividade"><i class="fa-solid fa-chart-line"></i> Produtividade</div>
             <div class="nav-item" data-page="bases" id="navBases"><i class="fa-solid fa-database"></i> Bases</div>
             <div class="nav-item" data-page="usuarios" id="navUsuarios"><i class="fa-solid fa-users-gear"></i> Usuários</div>
         </nav>
@@ -144,181 +162,142 @@
             <div class="user-info" id="userInfo" style="display:none;">
                 <div class="user-avatar" id="userAvatar">--</div>
                 <div style="flex:1"><div id="userName">--</div><div id="userLevel" style="font-size:0.65rem;color:var(--muted);"></div></div>
+                <button class="btn ghost" onclick="abrirModalAlterarSenha()"><i class="fa-solid fa-key"></i></button>
                 <button class="btn ghost" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
-            <div class="theme-toggle" id="themeToggle"><i class="fa-solid fa-moon"></i><span>Modo Escuro</span></div>
+            <div class="theme-toggle" id="themeToggle" role="button" tabindex="0" aria-label="Alternar tema">
+                <i class="fa-solid fa-moon"></i>
+                <span class="theme-copy"><strong>Modo Escuro</strong><small>Ativar tema</small></span>
+                <span class="theme-switch"><span></span></span>
+            </div>
             <div>Desenvolvido por <strong>Pablo Martins Lopes</strong></div>
         </div>
     </aside>
 
     <!-- Conteúdo principal -->
-    <main class="main-content">
-        <div class="page-header">
-            <div class="page-title"><h1>Produtividade</h1></div>
-        </div>
-
-        <!-- Seletor de operação -->
-        <div class="prod-selector" id="prodSelector">
-            <button class="btn active" data-op="RECEBIMENTO" onclick="trocarOperacao('RECEBIMENTO')">RECEBIMENTO</button>
-            <button class="btn" data-op="VERTICAL" onclick="trocarOperacao('VERTICAL')">VERTICAL</button>
-            <button class="btn" data-op="HORIZONTAL" onclick="trocarOperacao('HORIZONTAL')">HORIZONTAL</button>
-            <button class="btn" data-op="SEPARACAO" onclick="trocarOperacao('SEPARACAO')">SEPARAÇÃO</button>
-            <button class="btn" data-op="EXPEDICAO" onclick="trocarOperacao('EXPEDICAO')">EXPEDIÇÃO</button>
-        </div>
-
-        <!-- Filtros dinâmicos -->
-        <div class="filter-bar" id="filtersContainer"></div>
-
-        <!-- Seletor de métrica -->
-        <div class="metric-bar" id="metricContainer"></div>
-
-        <!-- Cards -->
-        <div class="cards-container" id="cardsContainer"></div>
-
-        <!-- Tabela -->
-        <div class="table-outer">
-            <div style="max-height:60vh;">
-                <table id="tabelaProd">
-                    <thead id="theadProd"></thead>
-                    <tbody id="tbodyProd"></tbody>
-                </table>
+    <main class="main-content" id="mainContent">
+        <!-- View inicial com vídeo -->
+        <div class="view active" id="view-home">
+            <video autoplay muted loop id="bgVideo">
+                <source src="7020027_Abstract_Nebula_1280x720.mp4" type="video/mp4">
+                Seu navegador não suporta vídeo.
+            </video>
+            <div class="home-overlay">
+                <div class="home-kicker"><span></span> OPERAÇÃO • CONTROLE DE PRESENÇA</div>
+                <h1>Heat Count <span>Vision</span></h1>
+                <p>Inteligência visual para pessoas, presença e produtividade.</p>
+                <div class="home-hint"><i class="fa-solid fa-arrow-pointer"></i> Selecione uma opção no menu lateral</div>
             </div>
         </div>
+
+        <!-- View Bases -->
+        <div class="view" id="view-bases">
+            <div class="page-header"><h1>Atualização de Bases</h1></div>
+            <div class="kpi-card" id="panelQuadro" style="display:none;">
+                <h4><i class="fa-solid fa-users"></i> Quadro HC</h4>
+                <input type="file" id="quadroFile" accept=".csv,.xlsx">
+                <button class="btn" onclick="uploadQuadro()">Enviar</button>
+                <div class="sync-log" id="quadroLog"></div>
+            </div>
+            <div class="kpi-card" id="panelFerias" style="display:none;">
+                <h4><i class="fa-solid fa-umbrella-beach"></i> Férias</h4>
+                <p class="panel-hint">Colunas esperadas: MATRICULA, DATA INICIO e DATA FIM</p>
+                <input type="file" id="feriasFile" accept=".xlsx,.xls,.csv">
+                <button class="btn" onclick="uploadFerias()">Enviar</button>
+                <div class="sync-log" id="feriasLog"></div>
+            </div>
+            <div class="kpi-card" id="panelSuricato" style="display:none;">
+                <h4>Suricato</h4>
+                <input type="file" id="suricatoFile" accept=".csv,.xlsx">
+                <button class="btn" onclick="uploadSuricato()">Enviar</button>
+                <div class="sync-log" id="suricatoLog"></div>
+            </div>
+            <div class="kpi-card" id="panelRec" style="display:none;">
+                <h4>DADOS_REC_NEW</h4>
+                <input type="file" id="recFolderInput" webkitdirectory multiple style="display:none;">
+                <button class="btn" onclick="document.getElementById('recFolderInput').click()">Selecionar Pasta REC</button>
+                <div class="sync-log" id="recLog"></div>
+            </div>
+            <div class="kpi-card" id="panelVT" style="display:none;">
+                <h4>VT_HR</h4>
+                <input type="file" id="vtFolderInput" webkitdirectory multiple style="display:none;">
+                <button class="btn" onclick="document.getElementById('vtFolderInput').click()">Selecionar Pasta VT_HR</button>
+                <div class="sync-log" id="vtLog"></div>
+            </div>
+            <div class="kpi-card" id="panelPLT" style="display:none;">
+                <h4>PLT_FECH</h4>
+                <input type="file" id="pltFolderInput" webkitdirectory multiple style="display:none;">
+                <button class="btn" onclick="document.getElementById('pltFolderInput').click()">Selecionar Pasta PLT_FECH</button>
+                <div class="sync-log" id="pltLog"></div>
+            </div>
+        </div>
+
+        <!-- View Usuários -->
+        <div class="view" id="view-usuarios">
+            <div class="page-header"><h1>Usuários</h1><button class="btn" onclick="abrirModalUsuario()">+ Novo</button></div>
+            <table>
+                <thead><tr><th>Matrícula</th><th>Nome</th><th>Nível</th><th>Ações</th></tr></thead>
+                <tbody id="usersTable"></tbody>
+            </table>
+        </div>
     </main>
+
+    <!-- Modal Usuário -->
+    <div class="modal-overlay" id="modalUsuario">
+        <div style="background:var(--card); padding:28px; border-radius:20px; width:90%; max-width:480px;">
+            <h3 id="modalUsuarioTitle">Novo Usuário</h3>
+            <div style="margin-bottom:10px;"><label>Matrícula</label><input id="muMatricula" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Nome</label><input id="muNome" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Senha</label><input type="password" id="muSenha" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Nível</label><select id="muLevel" style="width:100%;padding:8px;"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+            <input type="hidden" id="muEdit">
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn ghost" onclick="fecharModalUsuario()">Cancelar</button><button class="btn" onclick="salvarUsuario()">Salvar</button></div>
+        </div>
+    </div>
+
+    <!-- Modal Alterar Senha -->
+    <div class="modal-overlay" id="modalSenha">
+        <div style="background:var(--card); padding:28px; border-radius:20px; width:90%; max-width:480px;">
+            <h3>Alterar Senha</h3>
+            <div style="margin-bottom:10px;"><label>Senha atual</label><input type="password" id="senhaAtual" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Nova</label><input type="password" id="senhaNova" style="width:100%;padding:8px;"></div>
+            <div style="margin-bottom:10px;"><label>Confirmar</label><input type="password" id="senhaConfirm" style="width:100%;padding:8px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn ghost" onclick="fecharModalSenha()">Cancelar</button><button class="btn" onclick="alterarSenha()">Alterar</button></div>
+        </div>
+    </div>
 
     <script>
         const sb = supabase.createClient('https://tvrfetjhqxvxorzytpci.supabase.co', 'sb_publishable_scc1UJAUVN-m0dk1NFpR-A_9LmNzHsF');
 
         let currentUser = null;
-        let operacaoAtual = 'RECEBIMENTO';
-        let ultimaRequisicao = 0;
-        let timerPesquisa = null;
-        let mapaHCCache = null;
-        let mapaHCPromise = null;
-        const metricasSelecionadas = {};
-        const dadosCache = new Map();
-        const CACHE_TTL_MS = 30000;
-        const estadoFiltros = {
-            dataInicio: '',
-            dataFim: '',
-            turnoFilter: '',
-            turno2Filter: '',
-            statusFilter: '',
-            buscaInput: '',
-            metric: ''
-        };
 
-        const viewConfigs = {
-            RECEBIMENTO: {
-                table: 'RECEB.',
-                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
-                personFields: { matricula: 'COND_CONF', nome: 'CONFERENTE' },
-                dateCol: 'DTA',
-                metrics: ['QTD_CARGAS'],
-                defaultMetric: 'QTD_CARGAS',
-                metricType: 'fixed',
-                filters: {
-                    cargo: 'CONFERENTE',
-                    turno: 'TURNO',
-                    turnoLabel: 'Turno',
-                    status: false,
-                    searchFields: ['CONFERENTE'],
-                    numericSearchFields: ['COND_CONF']
-                },
-                extraCondition: { field: 'CONFERENTE', notEqual: 'AAA VIRTUAL' }
-            },
-            VERTICAL: {
-                table: 'VT_HR',
-                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
-                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
-                dateCol: 'DTA_PROD',
-                metrics: ['QTD_PESO', 'QTD_PLT'],
-                defaultMetric: 'QTD_PLT',
-                metricType: 'select',
-                filters: {
-                    cargo: 'OPERADOR EMPILHADEIRA CD',
-                    turno: 'TURNO_PROD',
-                    turnoLabel: 'Turno',
-                    status: false,
-                    searchFields: ['PRODUTIVO'],
-                    numericSearchFields: ['CODPRODUTIVO']
-                },
-                extraCondition: { field: 'ATIVIDADE', value: 'MOV. VERTICAL' }
-            },
-            HORIZONTAL: {
-                table: 'VT_HR',
-                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
-                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
-                dateCol: 'DTA_PROD',
-                metrics: ['QTD_PESO', 'QTD_PLT'],
-                defaultMetric: 'QTD_PLT',
-                metricType: 'select',
-                filters: {
-                    cargo: 'OPERADOR CD',
-                    turno: 'TURNO_PROD',
-                    turnoLabel: 'Turno',
-                    status: false,
-                    searchFields: ['PRODUTIVO'],
-                    numericSearchFields: ['CODPRODUTIVO']
-                },
-                extraCondition: { field: 'ATIVIDADE', value: 'MOV. HORIZONTAL' }
-            },
-            SEPARACAO: {
-                table: 'PLT_FECH',
-                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
-                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
-                dateCol: 'DTA_INI',
-                metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
-                defaultMetric: 'QTD_CXS',
-                metricType: 'select',
-                highlightThreshold: { metric: 'QTD_CXS', value: 800 },
-                filters: {
-                    cargo: 'SEPARADOR CD',
-                    turno: 'TURNO_FAT',
-                    turnoLabel: 'Turno Fat',
-                    turno2: 'TURNO_PROD',
-                    turno2Label: 'Turno Prod',
-                    status: true,
-                    searchFields: ['PRODUTIVO'],
-                    numericSearchFields: ['CODPRODUTIVO']
-                },
-                extraCondition: { field: 'PLTFECHADO', notEqual: 'CONFERENTE' }
-            },
-            EXPEDICAO: {
-                table: 'PLT_FECH',
-                fixedCols: ['MATRICULA', 'NOME', 'CARGO'],
-                personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
-                dateCol: 'DTA_INI',
-                metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
-                defaultMetric: 'QTD_CARGAS',
-                metricType: 'select',
-                filters: {
-                    cargo: 'CONFERENTE',
-                    turno: 'TURNO_FAT',
-                    turnoLabel: 'Turno Fat',
-                    turno2: 'TURNO_PROD',
-                    turno2Label: 'Turno Prod',
-                    status: true,
-                    searchFields: ['PRODUTIVO'],
-                    numericSearchFields: ['CODPRODUTIVO']
-                },
-                extraCondition: { field: 'PLTFECHADO', value: 'CONFERENTE' }
-            }
-        };
-
+        // ========== FUNÇÕES DE UI ==========
         function showLoading() { document.getElementById('loadingOverlay').classList.add('show'); }
         function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
-
-        function aplicarUI() {
-            if (!currentUser) return;
-            document.getElementById('userInfo').style.display = 'flex';
-            document.getElementById('userName').textContent = currentUser.nome.split(' ')[0];
-            document.getElementById('userAvatar').textContent = currentUser.nome.substring(0,2).toUpperCase();
-            const lvl = currentUser.level;
-            document.getElementById('userLevel').textContent = lvl===1?'Total':lvl===2?'RH':lvl===3?'Analista':'Visualizador';
-            document.getElementById('navBases').style.display = lvl<4?'':'none';
-            document.getElementById('navUsuarios').style.display = lvl===1?'':'none';
+        function abrirModalUsuario(mat=null) {
+            document.getElementById('modalUsuario').classList.add('active');
+            document.getElementById('muMatricula').value = mat || '';
+            document.getElementById('muNome').value = '';
+            document.getElementById('muSenha').value = '';
+            document.getElementById('muLevel').value = '4';
+            document.getElementById('muEdit').value = mat || '';
+            if (mat) {
+                sb.from('USERS').select('*').eq('Matricula', mat).limit(1).then(({ data }) => {
+                    if (data?.length) {
+                        document.getElementById('muNome').value = data[0].Nome || '';
+                        document.getElementById('muLevel').value = data[0].Level;
+                        document.getElementById('muMatricula').readOnly = true;
+                    }
+                });
+            } else {
+                document.getElementById('muMatricula').readOnly = false;
+            }
         }
+        window.abrirModalUsuario = abrirModalUsuario;
+        window.fecharModalUsuario = () => document.getElementById('modalUsuario').classList.remove('active');
+        window.editarUsuario = mat => abrirModalUsuario(mat);
+        window.abrirModalAlterarSenha = () => document.getElementById('modalSenha').classList.add('active');
+        window.fecharModalSenha = () => document.getElementById('modalSenha').classList.remove('active');
 
         async function tentarLogin() {
             const u = document.getElementById('loginUser').value.trim(), p = document.getElementById('loginPass').value;
@@ -333,9 +312,19 @@
                 document.getElementById('loginOverlay').classList.add('fade-out');
                 setTimeout(() => document.getElementById('loginOverlay').style.display = 'none', 500);
                 aplicarUI();
-                inicializarProdutividade();
-            } catch (e) { alert(e.message); }
-            finally { btn.disabled = false; btn.innerHTML = 'Entrar'; }
+                // Se houver page param, navegar para lá, senão home
+                const pageParam = getUrlParameter('page');
+                if (pageParam === 'bases' || pageParam === 'usuarios') {
+                    navegar(pageParam);
+                } else {
+                    navegar('home');
+                }
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Entrar';
+            }
         }
         window.tentarLogin = tentarLogin;
 
@@ -345,12 +334,42 @@
             document.getElementById('loginOverlay').style.display = 'flex';
             document.getElementById('loginOverlay').classList.remove('fade-out');
             document.getElementById('userInfo').style.display = 'none';
+            navegar('home');
         }
 
-        function abrirMenuPrincipal(page) {
-            const url = new URL('index.html', window.location.href);
-            url.searchParams.set('page', page);
-            window.location.assign(url.href);
+        function aplicarUI() {
+            if (!currentUser) return;
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('userName').textContent = currentUser.nome.split(' ')[0];
+            document.getElementById('userAvatar').textContent = currentUser.nome.substring(0,2).toUpperCase();
+            const lvl = currentUser.level;
+            document.getElementById('userLevel').textContent = lvl===1?'Total':lvl===2?'RH':lvl===3?'Analista':'Visualizador';
+            // Bases visível para níveis < 4 (ou todos? no original era nível <4)
+            document.getElementById('navBases').style.display = lvl<4?'':'none';
+            // Usuários visível apenas para nível 1
+            document.getElementById('navUsuarios').style.display = lvl===1?'':'none';
+            // Absenteísmo e Produtividade visíveis para todos logados (já estão no HTML)
+        }
+
+        function navegar(page) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            if (page === 'home') {
+                document.getElementById('view-home').classList.add('active');
+                return;
+            }
+            document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
+            document.getElementById(`view-${page}`).classList.add('active');
+            if (page === 'usuarios') carregarUsuarios();
+            if (page === 'bases') {
+                const lvl = currentUser?.level || 4;
+                document.getElementById('panelQuadro').style.display = (lvl===1||lvl===2)?'':'none';
+                document.getElementById('panelFerias').style.display = (lvl===1||lvl===2)?'':'none';
+                document.getElementById('panelSuricato').style.display = (lvl===1||lvl===3)?'':'none';
+                document.getElementById('panelRec').style.display = (lvl===1||lvl===2||lvl===3)?'':'none';
+                document.getElementById('panelVT').style.display = (lvl===1||lvl===2||lvl===3)?'':'none';
+                document.getElementById('panelPLT').style.display = (lvl===1||lvl===2||lvl===3)?'':'none';
+            }
         }
 
         // Navegação lateral
@@ -359,490 +378,1138 @@
             if (page === 'absenteismo') {
                 window.location.href = 'abs.html';
             } else if (page === 'produtividade') {
-                // já está aqui
-            } else if (page === 'bases' || page === 'usuarios') {
-                abrirMenuPrincipal(page);
+                window.location.href = 'produtividade.html';
+            } else {
+                navegar(page);
             }
         }));
 
-        document.getElementById('themeToggle').addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            const d = document.body.classList.contains('dark-mode');
-            document.getElementById('themeToggle').innerHTML = d ? '<i class="fa-solid fa-sun"></i><span>Modo Claro</span>' : '<i class="fa-solid fa-moon"></i><span>Modo Escuro</span>';
+        const themeToggle = document.getElementById('themeToggle');
+        function aplicarTema(escuro) {
+            document.body.classList.toggle('dark-mode', escuro);
+            const icon = themeToggle.querySelector(':scope > i');
+            const title = themeToggle.querySelector('.theme-copy strong');
+            const subtitle = themeToggle.querySelector('.theme-copy small');
+            if (icon) icon.className = escuro ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            if (title) title.textContent = escuro ? 'Modo Claro' : 'Modo Escuro';
+            if (subtitle) subtitle.textContent = escuro ? 'Usar tema claro' : 'Ativar tema';
+            localStorage.setItem('hc_theme', escuro ? 'dark' : 'light');
+        }
+        themeToggle.addEventListener('click', () => aplicarTema(!document.body.classList.contains('dark-mode')));
+        themeToggle.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                aplicarTema(!document.body.classList.contains('dark-mode'));
+            }
         });
+        aplicarTema(localStorage.getItem('hc_theme') === 'dark');
 
-        function capturarEstadoFiltros() {
-            ['dataInicio', 'dataFim', 'turnoFilter', 'turno2Filter', 'statusFilter', 'buscaInput'].forEach(id => {
-                const elemento = document.getElementById(id);
-                if (elemento) estadoFiltros[id] = elemento.value;
+        function iniciarParticulasSidebar() {
+            const canvas = document.getElementById('particleCanvas');
+            const sidebar = document.querySelector('.sidebar');
+            if (!canvas || !sidebar) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            const reduzirMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let width = 0, height = 0, dpr = 1, raf = 0, particles = [];
+            const quantidade = 72;
+            const criarParticula = () => ({
+                x: Math.random() * 2 - 1,
+                y: Math.random() * 2 - 1,
+                z: Math.random() * .95 + .12,
+                size: Math.random() * 1.8 + .55,
+                speed: Math.random() * .0014 + .00055,
+                phase: Math.random() * Math.PI * 2
             });
-            const metricSelect = document.getElementById('metricSelect');
-            if (metricSelect) {
-                estadoFiltros.metric = metricSelect.value;
-                metricasSelecionadas[operacaoAtual] = metricSelect.value;
+            function redimensionar() {
+                const rect = sidebar.getBoundingClientRect();
+                width = rect.width;
+                height = rect.height;
+                dpr = Math.min(window.devicePixelRatio || 1, 2);
+                canvas.width = Math.round(width * dpr);
+                canvas.height = Math.round(height * dpr);
+                canvas.style.width = `${width}px`;
+                canvas.style.height = `${height}px`;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                particles = Array.from({ length: quantidade }, criarParticula);
             }
-        }
-
-        function agendarCarregamento() {
-            capturarEstadoFiltros();
-            clearTimeout(timerPesquisa);
-            timerPesquisa = setTimeout(() => carregarDadosProd(), 250);
-        }
-        window.agendarCarregamento = agendarCarregamento;
-
-        function trocarOperacao(op) {
-            capturarEstadoFiltros();
-            operacaoAtual = op;
-            document.querySelectorAll('.prod-selector .btn').forEach(b => b.classList.remove('active'));
-            document.querySelector(`.prod-selector .btn[data-op="${op}"]`).classList.add('active');
-            construirFiltros();
-            construirMetrica();
-            carregarDadosProd();
-        }
-        window.trocarOperacao = trocarOperacao;
-
-        function construirFiltros() {
-            const config = viewConfigs[operacaoAtual];
-            const container = document.getElementById('filtersContainer');
-            const periodoPadrao = obterPeriodoPadrao();
-            const dataInicio = estadoFiltros.dataInicio || periodoPadrao.inicio;
-            const dataFim = estadoFiltros.dataFim || periodoPadrao.fim;
-            if (!estadoFiltros.dataInicio) estadoFiltros.dataInicio = dataInicio;
-            if (!estadoFiltros.dataFim) estadoFiltros.dataFim = dataFim;
-            let html = `
-                <div class="filter-group">
-                    <label>De:</label>
-                    <input type="date" id="dataInicio" value="${dataInicio}" onchange="carregarDadosProd()">
-                </div>
-                <div class="filter-group">
-                    <label>Até:</label>
-                    <input type="date" id="dataFim" value="${dataFim}" onchange="carregarDadosProd()">
-                </div>
-            `;
-            if (config.filters.turno) {
-                html += `
-                <div class="filter-group">
-                    <label>${config.filters.turnoLabel || 'Turno'}</label>
-                    <select id="turnoFilter" onchange="carregarDadosProd()">
-                        <option value="">Todos</option>
-                        <option value="1_TURNO">1_TURNO</option>
-                        <option value="2_TURNO">2_TURNO</option>
-                        <option value="3_TURNO">3_TURNO</option>
-                    </select>
-                </div>`;
-            }
-            if (config.filters.turno2) {
-                html += `
-                <div class="filter-group">
-                    <label>${config.filters.turno2Label || 'Turno 2'}</label>
-                    <select id="turno2Filter" onchange="carregarDadosProd()">
-                        <option value="">Todos</option>
-                        <option value="1_TURNO">1_TURNO</option>
-                        <option value="2_TURNO">2_TURNO</option>
-                        <option value="3_TURNO">3_TURNO</option>
-                    </select>
-                </div>`;
-            }
-            if (config.filters.status) {
-                html += `
-                <div class="filter-group">
-                    <label>Status</label>
-                    <input type="text" id="statusFilter" placeholder="Status" oninput="agendarCarregamento()">
-                </div>`;
-            }
-            html += `
-                <div class="filter-group">
-                    <label>Colaborador</label>
-                    <input type="text" id="buscaInput" placeholder="Nome ou matrícula..." oninput="agendarCarregamento()" style="min-width:200px;">
-                </div>
-            `;
-            container.innerHTML = html;
-
-            const turno = document.getElementById('turnoFilter');
-            const turno2 = document.getElementById('turno2Filter');
-            const status = document.getElementById('statusFilter');
-            const busca = document.getElementById('buscaInput');
-            if (turno) turno.value = estadoFiltros.turnoFilter || '';
-            if (turno2) turno2.value = estadoFiltros.turno2Filter || '';
-            if (status) status.value = estadoFiltros.statusFilter || '';
-            if (busca) busca.value = estadoFiltros.buscaInput || '';
-        }
-
-        function construirMetrica() {
-            const config = viewConfigs[operacaoAtual];
-            const container = document.getElementById('metricContainer');
-            if (config.metricType === 'fixed') {
-                estadoFiltros.metric = config.metrics[0];
-                metricasSelecionadas[operacaoAtual] = config.metrics[0];
-                container.innerHTML = `<label>Métrica:</label><span style="font-family:var(--mono);">${config.metrics[0]}</span>`;
-            } else {
-                const options = config.metrics.map(m => `<option value="${m}">${m}</option>`).join('');
-                container.innerHTML = `<label>Métrica:</label><select id="metricSelect" onchange="carregarDadosProd()">${options}</select>`;
-                const metricSelect = document.getElementById('metricSelect');
-                const metricSalva = metricasSelecionadas[operacaoAtual] || config.defaultMetric || config.metrics[0];
-                metricSelect.value = config.metrics.includes(metricSalva) ? metricSalva : config.metrics[0];
-                estadoFiltros.metric = metricSelect.value;
-                metricasSelecionadas[operacaoAtual] = metricSelect.value;
-            }
-        }
-
-        function normalizarMatricula(valor) {
-            const texto = String(valor ?? '').trim();
-            if (!texto) return '';
-            return /^\d+$/.test(texto) ? String(Number(texto)) : texto.toUpperCase();
-        }
-
-        function formatarDataLocal(data) {
-            return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
-        }
-
-        function obterPeriodoPadrao() {
-            const agora = new Date();
-            const primeiroDia = new Date(agora.getFullYear(), agora.getMonth(), 1);
-            return {
-                inicio: formatarDataLocal(primeiroDia),
-                fim: formatarDataLocal(agora)
-            };
-        }
-
-        function gerarDatasDoPeriodo(inicio, fim) {
-            const datas = [];
-            const atual = new Date(`${inicio}T00:00:00`);
-            const limite = new Date(`${fim}T00:00:00`);
-            while (atual <= limite) {
-                datas.push(formatarDataLocal(atual));
-                atual.setDate(atual.getDate() + 1);
-            }
-            return datas;
-        }
-
-        async function carregarMapaColaboradores() {
-            if (mapaHCCache) return mapaHCCache;
-            if (mapaHCPromise) return mapaHCPromise;
-
-            mapaHCPromise = (async () => {
-                const mapa = new Map();
-                try {
-                    const registrosHC = await fetchAll(sb.from('HC').select('*'));
-                    (registrosHC || []).forEach(reg => {
-                        const matricula = reg.Matricula ?? reg.MATRICULA ?? reg.CODPRODUTIVO;
-                        const chave = normalizarMatricula(matricula);
-                        if (chave) mapa.set(chave, reg);
-                    });
-                } catch (e) {
-                    console.warn('Não foi possível carregar o cadastro HC para complementar cargo:', e.message);
-                }
-                mapaHCCache = mapa;
-                return mapa;
-            })();
-
-            try {
-                return await mapaHCPromise;
-            } finally {
-                mapaHCPromise = null;
-            }
-        }
-
-        function montarColunasConsulta(config) {
-            const colunas = [
-                config.dateCol,
-                ...(config.metrics || []),
-                ...(Object.values(config.personFields || {})),
-                config.filters.cargo,
-                config.filters.turno,
-                config.filters.turno2,
-                config.filters.status ? 'STATUS' : null,
-                ...(config.filters.searchFields || []),
-                ...(config.filters.numericSearchFields || []),
-                config.extraCondition?.field
-            ];
-            return [...new Set(colunas.filter(Boolean))].join(',');
-        }
-
-        function numeroValido(valor) {
-            if (valor === null || valor === undefined) return null;
-            if (typeof valor === 'string' && valor.trim() === '') return null;
-            const numero = Number(valor);
-            return Number.isFinite(numero) ? numero : null;
-        }
-
-        function valorColaborador(registro, config, mapaHC) {
-            const matriculaOrigem = registro[config.personFields.matricula];
-            const chaveMatricula = normalizarMatricula(matriculaOrigem);
-            const cadastro = mapaHC.get(chaveMatricula) || {};
-            const nome = registro[config.personFields.nome] || cadastro.Nome || cadastro.NOME || '';
-            const cargo = cadastro['Descrição do cargo'] || cadastro.CARGO || cadastro.Cargo || cadastro['DESCRICAO CARGO'] || registro.CARGO || '';
-            return {
-                matricula: matriculaOrigem ?? '',
-                nome,
-                cargo,
-                chave: chaveMatricula || String(nome).trim().toUpperCase()
-            };
-        }
-
-        async function carregarDadosProd() {
-            if (!currentUser) return;
-            capturarEstadoFiltros();
-            const requestId = ++ultimaRequisicao;
-            const config = viewConfigs[operacaoAtual];
-            const dateCol = config.dateCol;
-            const startDate = document.getElementById('dataInicio').value;
-            const endDate = document.getElementById('dataFim').value;
-
-            if (!startDate || !endDate) {
-                const periodoPadrao = obterPeriodoPadrao();
-                document.getElementById('dataInicio').value = periodoPadrao.inicio;
-                document.getElementById('dataFim').value = periodoPadrao.fim;
-                estadoFiltros.dataInicio = periodoPadrao.inicio;
-                estadoFiltros.dataFim = periodoPadrao.fim;
-                return carregarDadosProd();
-            }
-            if (startDate > endDate) {
-                document.getElementById('tbodyProd').innerHTML = '<tr><td colspan="20">O período inicial não pode ser maior que o período final.</td></tr>';
-                return;
-            }
-
-            const turnoFilter = config.filters.turno ? document.getElementById('turnoFilter')?.value : null;
-            const turno2Filter = config.filters.turno2 ? document.getElementById('turno2Filter')?.value : null;
-            const statusFilter = config.filters.status ? document.getElementById('statusFilter')?.value : null;
-            const busca = document.getElementById('buscaInput')?.value.trim() || '';
-            const metric = config.metricType === 'fixed' ? config.metrics[0] : document.getElementById('metricSelect')?.value;
-            const cacheKey = JSON.stringify({
-                operacaoAtual,
-                startDate,
-                endDate,
-                turnoFilter,
-                turno2Filter,
-                statusFilter,
-                busca,
-                metric
-            });
-
-            showLoading();
-            try {
-                let query = sb.from(config.table).select(montarColunasConsulta(config))
-                    .gte(dateCol, startDate)
-                    .lte(dateCol, endDate);
-
-                if (config.filters.cargo) query = query.eq('CARGO', config.filters.cargo);
-
-                if (config.extraCondition) {
-                    if (config.extraCondition.values) {
-                        query = query.in(config.extraCondition.field, config.extraCondition.values);
-                    } else if (config.extraCondition.notEqual !== undefined) {
-                        query = query.neq(config.extraCondition.field, config.extraCondition.notEqual);
-                    } else {
-                        query = query.eq(config.extraCondition.field, config.extraCondition.value);
+            function desenhar(tempo) {
+                ctx.clearRect(0, 0, width, height);
+                const pontos = [];
+                particles.forEach(p => {
+                    p.z -= p.speed;
+                    p.phase += .004;
+                    p.x += Math.sin(p.phase + tempo * .00025) * .00018;
+                    if (p.z < .08) Object.assign(p, criarParticula(), { z: 1.05 });
+                    const escala = 1 / p.z;
+                    const x = width * .5 + p.x * width * .42 * escala;
+                    const y = height * .48 + p.y * height * .48 * escala;
+                    const raio = Math.max(.35, p.size * (1.12 - p.z) * 1.15);
+                    if (x < -20 || x > width + 20 || y < -20 || y > height + 20) return;
+                    pontos.push({ x, y, raio, z: p.z });
+                    const brilho = Math.max(.12, Math.min(.9, (1.08 - p.z) * .8));
+                    ctx.beginPath();
+                    ctx.fillStyle = `rgba(105, 224, 255, ${brilho})`;
+                    ctx.shadowBlur = 8 * brilho;
+                    ctx.shadowColor = '#25d9ff';
+                    ctx.arc(x, y, raio, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                });
+                for (let i = 0; i < pontos.length; i++) {
+                    for (let j = i + 1; j < pontos.length; j++) {
+                        const dx = pontos[i].x - pontos[j].x;
+                        const dy = pontos[i].y - pontos[j].y;
+                        const distancia = Math.sqrt(dx * dx + dy * dy);
+                        if (distancia < 58) {
+                            const alpha = (1 - distancia / 58) * .16;
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(67, 193, 255, ${alpha})`;
+                            ctx.lineWidth = .55;
+                            ctx.moveTo(pontos[i].x, pontos[i].y);
+                            ctx.lineTo(pontos[j].x, pontos[j].y);
+                            ctx.stroke();
+                        }
                     }
                 }
-                if (turnoFilter) query = query.eq(config.filters.turno, turnoFilter);
-                if (turno2Filter) query = query.eq(config.filters.turno2, turno2Filter);
-                if (statusFilter && statusFilter.trim() !== '') query = query.eq('STATUS', statusFilter.trim());
+            }
+            function animar(tempo) {
+                desenhar(tempo);
+                raf = requestAnimationFrame(animar);
+            }
+            redimensionar();
+            window.addEventListener('resize', redimensionar, { passive: true });
+            if (reduzirMovimento) desenhar(0);
+            else raf = requestAnimationFrame(animar);
+        }
+        iniciarParticulasSidebar();
 
-                if (busca) {
-                    const buscaSegura = busca.replace(/[(),]/g, ' ').trim();
-                    const partesTexto = (config.filters.searchFields || []).map(f => `${f}.ilike.%${buscaSegura}%`);
-                    const partesNumericas = /^\d+$/.test(buscaSegura)
-                        ? (config.filters.numericSearchFields || []).map(f => `${f}.eq.${buscaSegura}`)
-                        : [];
-                    const orParts = [...partesTexto, ...partesNumericas].join(',');
-                    if (orParts) query = query.or(orParts);
-                }
-
-                const cacheAtual = dadosCache.get(cacheKey);
-                const dadosPromise = cacheAtual && Date.now() - cacheAtual.timestamp < CACHE_TTL_MS
-                    ? Promise.resolve(cacheAtual.data)
-                    : fetchAll(query).then(data => {
-                        dadosCache.set(cacheKey, { timestamp: Date.now(), data });
-                        return data;
-                    });
-                const [allData, mapaHC] = await Promise.all([dadosPromise, carregarMapaColaboradores()]);
-                if (requestId !== ultimaRequisicao) return;
-                const pivot = buildPivot(allData, config, metric, startDate, endDate, mapaHC);
-                renderTable(pivot, config.fixedCols, config, metric);
-                renderCards(pivot, metric);
+        // ========== USUÁRIOS ==========
+        async function carregarUsuarios() {
+            const { data } = await sb.from('USERS').select('*').order('Matricula');
+            document.getElementById('usersTable').innerHTML = (data || []).map(u => `<tr><td>${u.Matricula}</td><td>${u.Nome || ''}</td><td>${u.Level}</td><td><button class="btn ghost" onclick="editarUsuario('${u.Matricula}')"><i class="fa-solid fa-pen"></i></button></td></tr>`).join('');
+        }
+        window.salvarUsuario = async () => {
+            const mat = document.getElementById('muMatricula').value.trim();
+            const nome = document.getElementById('muNome').value.trim();
+            const senha = document.getElementById('muSenha').value;
+            const level = document.getElementById('muLevel').value;
+            const edit = document.getElementById('muEdit').value;
+            if (!mat || !nome) return alert('Preencha matrícula e nome.');
+            const payload = { Matricula: mat, Nome: nome, Level: Number(level) };
+            if (senha) payload.Password = senha;
+            try {
+                if (edit) await sb.from('USERS').update(payload).eq('Matricula', edit);
+                else await sb.from('USERS').insert(payload);
+                fecharModalUsuario();
+                carregarUsuarios();
             } catch (e) {
-                if (requestId !== ultimaRequisicao) return;
-                console.error(e);
-                document.getElementById('tbodyProd').innerHTML = `<tr><td colspan="20">Erro ao consultar o Supabase: ${e.message}</td></tr>`;
-                document.getElementById('cardsContainer').innerHTML = '';
-            } finally {
-                if (requestId === ultimaRequisicao) hideLoading();
+                alert(e.message);
+            }
+        };
+        window.alterarSenha = async () => {
+            const atual = document.getElementById('senhaAtual').value;
+            const nova = document.getElementById('senhaNova').value;
+            const conf = document.getElementById('senhaConfirm').value;
+            if (!atual || !nova || nova !== conf) return alert('Verifique os campos.');
+            const { data } = await sb.from('USERS').select('Password').eq('Matricula', currentUser.matricula).limit(1);
+            if (!data?.length || data[0].Password !== atual) return alert('Senha atual incorreta.');
+            await sb.from('USERS').update({ Password: nova }).eq('Matricula', currentUser.matricula);
+            alert('Senha alterada com sucesso.');
+            fecharModalSenha();
+        };
+
+        // ========== UTILITÁRIOS DE ARQUIVOS ==========
+        function limparValor(v) { return String(v || '').replace(/[.,'"]/g, '').trim(); }
+        function calcularIdade(dataNascStr) {
+            if (!dataNascStr) return null;
+            const match = String(dataNascStr).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (!match) return null;
+            const [_, d, m, y] = match;
+            const nasc = new Date(y, m-1, d);
+            const hoje = new Date();
+            let idade = hoje.getFullYear() - nasc.getFullYear();
+            const mesDiff = hoje.getMonth() - nasc.getMonth();
+            if (mesDiff < 0 || (mesDiff === 0 && hoje.getDate() < nasc.getDate())) idade--;
+            return idade;
+        }
+        function calcularTempoCasa(dataAdmStr) {
+            if (!dataAdmStr) return null;
+            const match = String(dataAdmStr).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (!match) return null;
+            const [_, d, m, y] = match;
+            const adm = new Date(y, m-1, d);
+            const hoje = new Date();
+            let totalMeses = (hoje.getFullYear() - adm.getFullYear()) * 12 + (hoje.getMonth() - adm.getMonth());
+            if (hoje.getDate() < adm.getDate()) totalMeses--;
+            const anos = Math.floor(totalMeses / 12);
+            const meses = totalMeses % 12;
+            return `${anos} ano(s) e ${meses} mes(es)`;
+        }
+        function normalizarCampoTXT(valor) {
+            return String(valor ?? '')
+                .replace(/^\uFEFF/, '')
+                .replace(/\u0000/g, '')
+                .trim()
+                .replace(/^"([\s\S]*)"$/, '$1')
+                .replace(/""/g, '"')
+                .trim();
+        }
+
+        function normalizarCabecalhoTXT(valor) {
+            return normalizarCampoTXT(valor)
+                .toUpperCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[\s-]+/g, '_');
+        }
+
+        function contarDelimitadoresForaDeAspas(linha, delimitador) {
+            let dentroDeAspas = false;
+            let quantidade = 0;
+            for (let i = 0; i < linha.length; i++) {
+                const caractere = linha[i];
+                if (caractere === '"') {
+                    if (dentroDeAspas && linha[i + 1] === '"') {
+                        i++;
+                    } else {
+                        dentroDeAspas = !dentroDeAspas;
+                    }
+                } else if (caractere === delimitador && !dentroDeAspas) {
+                    quantidade++;
+                }
+            }
+            return quantidade;
+        }
+
+        function detectDelim(linha) {
+            // O REC_NEW usa ponto e vírgula. Ele fica como padrão e também vence empates.
+            const candidatos = [';', ',', '\t', '|'];
+            let melhor = ';';
+            let max = 0;
+            candidatos.forEach(delimitador => {
+                const quantidade = contarDelimitadoresForaDeAspas(linha, delimitador);
+                if (quantidade > max) {
+                    max = quantidade;
+                    melhor = delimitador;
+                }
+            });
+            return melhor;
+        }
+
+        function separarLinhaTXT(linha, delimitador) {
+            const valores = [];
+            let atual = '';
+            let dentroDeAspas = false;
+            for (let i = 0; i < linha.length; i++) {
+                const caractere = linha[i];
+                if (caractere === '"') {
+                    if (dentroDeAspas && linha[i + 1] === '"') {
+                        atual += '"';
+                        i++;
+                    } else {
+                        dentroDeAspas = !dentroDeAspas;
+                    }
+                } else if (caractere === delimitador && !dentroDeAspas) {
+                    valores.push(normalizarCampoTXT(atual));
+                    atual = '';
+                } else {
+                    atual += caractere;
+                }
+            }
+            valores.push(normalizarCampoTXT(atual));
+            return valores;
+        }
+
+        async function lerArquivoComoMatriz(file) {
+            const nome = file.name.toLowerCase();
+            if (nome.endsWith('.csv') || nome.endsWith('.txt')) {
+                const text = await file.text();
+                const linhas = text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter(l => l.trim());
+                if (!linhas.length) return [];
+                const delim = detectDelim(linhas[0]);
+                return linhas.map(l => separarLinhaTXT(l, delim));
+            } else {
+                const buf = await file.arrayBuffer();
+                const wb = XLSX.read(buf, { type:'array' });
+                const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+                return data.filter(row => row.some(cell => cell !== '')).map(row => row.map(cell => limparValor(cell)));
             }
         }
-        window.carregarDadosProd = carregarDadosProd;
 
-        async function fetchAll(query) {
-            let all = [];
+        function detectarCodificacaoTXT(bytes) {
+            if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return 'utf-8';
+            if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) return 'utf-16le';
+            if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) return 'utf-16be';
+
+            const amostra = bytes.subarray(0, Math.min(bytes.length, 12000));
+            let nulosPares = 0, nulosImpares = 0;
+            for (let i = 0; i < amostra.length; i++) {
+                if (amostra[i] === 0) {
+                    if (i % 2 === 0) nulosPares++;
+                    else nulosImpares++;
+                }
+            }
+            if (nulosImpares > 8 && nulosImpares > nulosPares * 2) return 'utf-16le';
+            if (nulosPares > 8 && nulosPares > nulosImpares * 2) return 'utf-16be';
+            return 'utf-8';
+        }
+
+        async function lerArquivoTXT(file) {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            const codificacao = detectarCodificacaoTXT(bytes);
+            let texto = new TextDecoder(codificacao, { fatal: false }).decode(bytes);
+            if (codificacao === 'utf-8' && (texto.includes('\uFFFD') || texto.includes('\u0000'))) {
+                try { texto = new TextDecoder('windows-1252', { fatal: false }).decode(bytes); } catch (_) {}
+            }
+            return texto.replace(/^\uFEFF/, '').replace(/\u0000/g, '');
+        }
+
+        const COLUNAS_REC_ORDEM = [
+            'CARGA', 'DESCRICAO', 'COND_CONF', 'CONFERENTE',
+            'PORTARIA_DATA', 'PORTARIA_HORA', 'GEROUCARGA_DATA', 'GEROUCARGA_HORA',
+            'INICIOCONF_DATA', 'INICIOCONF_HORA', 'FINALCONF_DATA', 'FINALCONF_HORA',
+            'TERMOLIB_DATA', 'TERMOLIB_HORA', 'QTDE_CXS'
+        ];
+
+        function parseTXT(text, colunasEsperadas = [], cabecalhoFallback = []) {
+            const linhas = String(text ?? '').replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter(l => l.trim());
+            if (linhas.length === 0) return [];
+
+            let indiceCabecalho = 0;
+            let delimiter = detectDelim(linhas[0]);
+            let headers = separarLinhaTXT(linhas[0], delimiter).map(normalizarCabecalhoTXT);
+
+            // Alguns exports trazem título, data de geração ou filtros antes do cabeçalho.
+            // No REC_NEW, encontre a linha que contém as colunas obrigatórias.
+            if (colunasEsperadas.length > 0) {
+                const esperadas = colunasEsperadas.map(c => normalizarCabecalhoTXT(c).replace(/_/g, ''));
+                const limiteBusca = Math.min(linhas.length, 50);
+                let encontrado = false;
+                for (let i = 0; i < limiteBusca; i++) {
+                    const delimAtual = detectDelim(linhas[i]);
+                    const headersAtuais = separarLinhaTXT(linhas[i], delimAtual).map(normalizarCabecalhoTXT);
+                    const compactos = headersAtuais.map(h => h.replace(/_/g, ''));
+                    if (esperadas.every(coluna => compactos.includes(coluna))) {
+                        indiceCabecalho = i;
+                        delimiter = delimAtual;
+                        headers = headersAtuais;
+                        encontrado = true;
+                        break;
+                    }
+                }
+                if (!encontrado) {
+                    // Alguns REC_CONF_V3 são exportados sem a linha de cabeçalho ou com o cabeçalho ilegível.
+                    // Nesse caso, usa-se a ordem definida pela Query e começa na primeira linha que tem data/hora de início.
+                    if (!cabecalhoFallback.length) return [];
+                    const delimitadorFallback = ';';
+                    let primeiraLinhaDados = -1;
+                    for (let i = 0; i < linhas.length; i++) {
+                        const valores = separarLinhaTXT(linhas[i], delimitadorFallback);
+                        if (valores.length < cabecalhoFallback.length) continue;
+                        const dataCandidata = parseDataBr(valores[8]);
+                        const horaCandidata = parseHora(valores[9]);
+                        if (dataCandidata && horaCandidata !== null) {
+                            primeiraLinhaDados = i;
+                            delimiter = delimitadorFallback;
+                            headers = cabecalhoFallback.map(normalizarCabecalhoTXT);
+                            indiceCabecalho = i - 1;
+                            encontrado = true;
+                            break;
+                        }
+                    }
+                    if (!encontrado || primeiraLinhaDados < 0) return [];
+                }
+            }
+
+            const rows = [];
+            for (let i = indiceCabecalho + 1; i < linhas.length; i++) {
+                const valores = separarLinhaTXT(linhas[i], delimiter);
+                // O Power Query preenche colunas ausentes com null; aqui fazemos o mesmo com string vazia.
+                // Uma linha totalmente sem separadores continua sendo ignorada quando o arquivo possui várias colunas.
+                if (headers.length > 1 && valores.length === 1 && !valores[0]) continue;
+                const obj = {};
+                headers.forEach((h, idx) => {
+                    if (h) obj[h] = valores[idx] ?? '';
+                });
+                rows.push(obj);
+            }
+            return rows;
+        }
+        function criarDataSegura(ano, mes, dia) {
+            const y = Number(ano), m = Number(mes), d = Number(dia);
+            if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+            const data = new Date(y, m - 1, d);
+            return data.getFullYear() === y && data.getMonth() === m - 1 && data.getDate() === d ? data : null;
+        }
+
+        function parseDataBr(dataStr) {
+            if (dataStr === null || dataStr === undefined) return null;
+            let str = normalizarCampoTXT(dataStr)
+                .replace(/[\u200B-\u200D\u2060\u00A0]/g, ' ')
+                .replace(/^date\s*[:=]\s*/i, '')
+                .trim();
+            if (!str) return null;
+
+            // Datas numéricas do Excel/Power Query, como 45292 ou 45292,0.
+            if (/^\d{1,6}(?:[.,]\d+)?$/.test(str)) {
+                const serial = Number(str.replace(',', '.'));
+                if (serial >= 1 && serial < 100000) {
+                    const data = new Date(Date.UTC(1899, 11, 30) + Math.round(serial * 86400000));
+                    return criarDataSegura(data.getUTCFullYear(), data.getUTCMonth() + 1, data.getUTCDate());
+                }
+            }
+
+            // Formato compacto yyyyMMdd, inclusive quando exportado como yyyyMMdd.0.
+            const compacta = str.match(/^(\d{4})(\d{2})(\d{2})(?:[.,]\d+)?(?:[T\s]|$)/);
+            if (compacta) {
+                const dataCompacta = criarDataSegura(compacta[1], compacta[2], compacta[3]);
+                if (dataCompacta) return dataCompacta;
+            }
+            const compactaDMY = str.match(/^(\d{2})(\d{2})(\d{4})(?:\d{2,6})?$/);
+            if (compactaDMY) return criarDataSegura(compactaDMY[3], compactaDMY[2], compactaDMY[1]);
+
+            // Formatos ano-mês-dia: yyyy-MM-dd, yyyy/MM/dd e yyyy.MM.dd, com ou sem horário.
+            const anoMesDia = str.match(/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})(?:[T\s.,]|$)/);
+            if (anoMesDia) return criarDataSegura(anoMesDia[1], anoMesDia[2], anoMesDia[3]);
+
+            // Formatos dia-mês-ano: dd/MM/yyyy, dd-MM-yyyy e dd.MM.yyyy, com ou sem horário.
+            const diaMesAno = str.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2}|\d{4})(?:[T\s.,]|$)/);
+            if (diaMesAno) {
+                let dia = Number(diaMesAno[1]);
+                let mes = Number(diaMesAno[2]);
+                const anoBruto = Number(diaMesAno[3]);
+                const ano = anoBruto < 100 ? 2000 + anoBruto : anoBruto;
+                if (mes > 12 && dia <= 12) [dia, mes] = [mes, dia];
+                return criarDataSegura(ano, mes, dia);
+            }
+
+            // Último fallback: procura uma data completa no meio do texto exportado.
+            const dentroAnoMesDia = str.match(/(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/);
+            if (dentroAnoMesDia) return criarDataSegura(dentroAnoMesDia[1], dentroAnoMesDia[2], dentroAnoMesDia[3]);
+            const dentroDiaMesAno = str.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2}|\d{4})/);
+            if (dentroDiaMesAno) {
+                const anoBruto = Number(dentroDiaMesAno[3]);
+                return criarDataSegura(anoBruto < 100 ? 2000 + anoBruto : anoBruto, dentroDiaMesAno[2], dentroDiaMesAno[1]);
+            }
+            return null;
+        }
+
+        function parseHora(horaStr) {
+            if (horaStr === null || horaStr === undefined) return null;
+            const original = normalizarCampoTXT(horaStr);
+            if (!original) return null;
+            const numero = Number(original.replace(',', '.'));
+            if (Number.isFinite(numero) && numero >= 0 && numero < 1 && /[.,]/.test(original)) {
+                return Math.round(numero * 24 * 60) % (24 * 60);
+            }
+            const str = original.replace(/[.,]/g, ':');
+            let m = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (!m && /^\d{6}$/.test(str)) m = str.match(/^(\d{2})(\d{2})(\d{2})$/);
+            if (!m && /^\d{4}$/.test(str)) m = str.match(/^(\d{2})(\d{2})$/);
+            if (!m) return null;
+            const horas = Number(m[1]);
+            const minutos = Number(m[2]);
+            if (horas > 23 || minutos > 59) return null;
+            return horas * 60 + minutos;
+        }
+
+        function parseInteiroPowerQuery(valor) {
+            const str = normalizarCampoTXT(valor);
+            if (!str) return null;
+            const somenteNumero = str.replace(/\s/g, '').replace(/\.(?=\d{3}(?:\D|$))/g, '').replace(',', '.');
+            const numero = Number(somenteNumero);
+            return Number.isFinite(numero) ? Math.trunc(numero) : null;
+        }
+        function formatarDataISO(date) {
+            return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+        }
+
+        // ========== PROCESSAMENTO DAS BASES ==========
+        function obterCampoRec(row, nome) {
+            const alvo = normalizarCabecalhoTXT(nome).replace(/_/g, '');
+            const chave = Object.keys(row).find(campo => normalizarCabecalhoTXT(campo).replace(/_/g, '') === alvo);
+            return chave === undefined ? '' : normalizarCampoTXT(row[chave]);
+        }
+
+        function processarDadosRecNew(rows, diagnostico = null) {
+            const registros = [];
+            const diag = diagnostico || { semData: 0, semHora: 0, dataInvalida: 0, horaInvalida: 0, aceitos: 0 };
+            for (const row of rows) {
+                const dataStr = obterCampoRec(row, 'INICIOCONF_DATA');
+                const horaStr = obterCampoRec(row, 'INICIOCONF_HORA');
+                if (!dataStr) { diag.semData++; continue; }
+                if (!horaStr) { diag.semHora++; continue; }
+                const data = parseDataBr(dataStr);
+                const minutos = parseHora(horaStr);
+                const carga = parseInteiroPowerQuery(obterCampoRec(row, 'CARGA'));
+                const condConf = parseInteiroPowerQuery(obterCampoRec(row, 'COND_CONF'));
+                if (!data) { diag.dataInvalida++; continue; }
+                if (minutos === null) { diag.horaInvalida++; continue; }
+                diag.aceitos++;
+                const turno = minutos < 6*60 ? '3_TURNO' :
+                              minutos < 14*60+20 ? '1_TURNO' :
+                              minutos < 22*60 ? '2_TURNO' : '3_TURNO';
+                const dta = minutos >= 22*60 ? new Date(data.getTime() + 24*60*60*1000) : data;
+                registros.push({
+                    DTA: formatarDataISO(dta),
+                    TURNO: turno,
+                    COND_CONF: condConf,
+                    CONFERENTE: obterCampoRec(row, 'CONFERENTE'),
+                    CARGA: carga
+                });
+            }
+            const distinctMap = new Map();
+            for (const r of registros) {
+                const key = `${r.DTA}|${r.TURNO}|${r.COND_CONF}|${r.CONFERENTE}|${r.CARGA}`;
+                if (!distinctMap.has(key)) distinctMap.set(key, r);
+            }
+            const groupMap = new Map();
+            for (const r of distinctMap.values()) {
+                const key = `${r.DTA}|${r.TURNO}|${r.COND_CONF}|${r.CONFERENTE}`;
+                if (!groupMap.has(key)) {
+                    groupMap.set(key, { DTA: r.DTA, TURNO: r.TURNO, COND_CONF: r.COND_CONF, CONFERENTE: r.CONFERENTE, QTD_CARGAS: 0 });
+                }
+                groupMap.get(key).QTD_CARGAS++;
+            }
+            return Array.from(groupMap.values());
+        }
+
+        function processarVT_HR(rows) {
+            const registros = [];
+            for (const row of rows) {
+                const dtaHor = row['DTAHORINITAREFA'];
+                if (!dtaHor || dtaHor.length < 16) continue;
+                const dataStr = dtaHor.substring(0, 10);
+                const horaStr = dtaHor.substring(11, 16).replace('.', ':');
+                const data = parseDataBr(dataStr);
+                const minutos = parseHora(horaStr);
+                if (!data || minutos === null) continue;
+                const turno = minutos < 6*60 ? '3_TURNO' :
+                              minutos < 14*60+20 ? '1_TURNO' :
+                              minutos < 22*60 ? '2_TURNO' : '3_TURNO';
+                const dta = minutos > 22*60 ? new Date(data.getTime() + 24*60*60*1000) : data;
+                registros.push({
+                    DTA_PROD: formatarDataISO(dta),
+                    TURNO_PROD: turno,
+                    CODPRODUTIVO: row['CODPRODUTIVO'] || '',
+                    PRODUTIVO: row['PRODUTIVO'] || '',
+                    ATIVIDADE: row['ATIVIDADE'] || '',
+                    SEQTAREFA: row['SEQTAREFA'] || '',
+                    PESO: parseFloat(row['PESO']?.replace(',', '.')) || 0
+                });
+            }
+            const keySet = new Set();
+            const distinctRows = [];
+            for (const r of registros) {
+                const key = `${r.DTA_PROD}|${r.TURNO_PROD}|${r.CODPRODUTIVO}|${r.SEQTAREFA}`;
+                if (!keySet.has(key)) {
+                    keySet.add(key);
+                    distinctRows.push(r);
+                }
+            }
+            const groupMap = new Map();
+            for (const r of distinctRows) {
+                const key = `${r.DTA_PROD}|${r.TURNO_PROD}|${r.CODPRODUTIVO}|${r.PRODUTIVO}|${r.ATIVIDADE}`;
+                if (!groupMap.has(key)) {
+                    groupMap.set(key, {
+                        DTA_PROD: r.DTA_PROD,
+                        TURNO_PROD: r.TURNO_PROD,
+                        CODPRODUTIVO: r.CODPRODUTIVO,
+                        PRODUTIVO: r.PRODUTIVO,
+                        ATIVIDADE: r.ATIVIDADE,
+                        QTD_PESO: 0,
+                        QTD_PLT: 0
+                    });
+                }
+                const g = groupMap.get(key);
+                g.QTD_PESO += r.PESO;
+                g.QTD_PLT++;
+            }
+            return Array.from(groupMap.values());
+        }
+
+        function processarPLT_FECH(rows) {
+            // Filtra linhas sem DTAHORINITAREFA e DTAHORFATURAMENTO
+            const filtered = rows.filter(row => {
+                const ini = row['DTAHORINITAREFA'];
+                const fat = row['DTAHORFATURAMENTO'];
+                return ini && ini.trim() !== '' && fat && fat.trim() !== '';
+            });
+
+            // Mapa para deduplicação: chave composta por todas as colunas que influenciam
+            const distinctMap = new Map();
+            for (const row of filtered) {
+                const dtaIni = row['DTAHORINITAREFA'];
+                const dtaFat = row['DTAHORFATURAMENTO'];
+                const status = row['STATUS'] || '';
+                const nroCarga = row['NROCARGA'] || '';
+                const seqLote = row['SEQLOTE'] || '';
+                const linhaSepar = row['LINHASEPAR'] || '';
+                const codProdutivo = row['CODPRODUTIVO'] || '';
+                const produtivo = row['PRODUTIVO'] || '';
+                const qtdEmb = parseFloat(row['QTDEMBCONTADA']?.replace(',', '.')) || 0;
+                const pltFechadoRaw = String(row['PLTFECHADO'] || '').trim();
+                const pltFechadoMaiusculo = pltFechadoRaw.toUpperCase();
+                const pltFechado = ['NÃO', 'NAO', 'N O'].includes(pltFechadoMaiusculo)
+                    ? 'SEPARAÇÃO'
+                    : (pltFechadoMaiusculo === 'SIM' ? 'CONFERENTE' : pltFechadoRaw);
+
+                const dataIni = parseDataBr(dtaIni.substring(0,10));
+                const horaIni = parseHora(dtaIni.substring(11,16).replace('.', ':'));
+                const dataFat = parseDataBr(dtaFat.substring(0,10));
+                const horaFat = parseHora(dtaFat.substring(11,16).replace('.', ':'));
+                if (!dataIni || horaIni === null || !dataFat || horaFat === null) continue;
+
+                const dtaFatAjustada = horaIni >= 22*60 ? new Date(dataIni.getTime() + 24*60*60*1000) : dataIni;
+                const turnoFat = horaIni < 6*60 ? '3_TURNO' :
+                                 horaIni < 14*60+20 ? '1_TURNO' :
+                                 horaIni < 22*60 ? '2_TURNO' : '3_TURNO';
+
+                const dtaIniAjustada = horaFat >= 22*60 ? new Date(dataFat.getTime() + 24*60*60*1000) : dataFat;
+                const turnoProd = horaFat < 6*60 ? '3_TURNO' :
+                                  horaFat < 14*60+20 ? '1_TURNO' :
+                                  horaFat < 22*60 ? '2_TURNO' : '3_TURNO';
+
+                const key = [
+                    formatarDataISO(dtaIniAjustada),
+                    formatarDataISO(dtaFatAjustada),
+                    turnoFat,
+                    turnoProd,
+                    status,
+                    nroCarga,
+                    seqLote,
+                    linhaSepar,
+                    codProdutivo,
+                    produtivo,
+                    pltFechado,
+                    qtdEmb
+                ].join('|');
+                if (!distinctMap.has(key)) {
+                    distinctMap.set(key, {
+                        DTA_INI: formatarDataISO(dtaIniAjustada),
+                        DTA_FAT: formatarDataISO(dtaFatAjustada),
+                        TURNO_FAT: turnoFat,
+                        TURNO_PROD: turnoProd,
+                        STATUS: status,
+                        NROCARGA: nroCarga,
+                        SEQLOTE: seqLote,
+                        LINHASEPAR: linhaSepar,
+                        CODPRODUTIVO: codProdutivo,
+                        PRODUTIVO: produtivo,
+                        QTDEMBCONTADA: qtdEmb,
+                        PLTFECHADO: pltFechado
+                    });
+                }
+            }
+
+            const finalGroupMap = new Map();
+            for (const r of distinctMap.values()) {
+                const key = `${r.DTA_INI}|${r.DTA_FAT}|${r.TURNO_FAT}|${r.TURNO_PROD}|${r.STATUS}|${r.LINHASEPAR}|${r.CODPRODUTIVO}|${r.PRODUTIVO}|${r.PLTFECHADO}`;
+                if (!finalGroupMap.has(key)) {
+                    finalGroupMap.set(key, {
+                        DTA_INI: r.DTA_INI,
+                        DTA_FAT: r.DTA_FAT,
+                        TURNO_FAT: r.TURNO_FAT,
+                        TURNO_PROD: r.TURNO_PROD,
+                        STATUS: r.STATUS,
+                        LINHASEPAR: r.LINHASEPAR,
+                        CODPRODUTIVO: r.CODPRODUTIVO,
+                        PRODUTIVO: r.PRODUTIVO,
+                        PLTFECHADO: r.PLTFECHADO,
+                        QTD_CARGAS: 0,
+                        QTD_LOTES: 0,
+                        QTD_VISITAS: 0,
+                        QTD_CXS: 0,
+                        setCargas: new Set(),
+                        setLotes: new Set(),
+                        visitas: 0
+                    });
+                }
+                const g = finalGroupMap.get(key);
+                g.setCargas.add(r.NROCARGA);
+                g.setLotes.add(r.SEQLOTE);
+                g.visitas++;
+                g.QTD_CXS += r.QTDEMBCONTADA;
+            }
+
+            const resultado = [];
+            for (const g of finalGroupMap.values()) {
+                g.QTD_CARGAS = g.setCargas.size;
+                g.QTD_LOTES = g.setLotes.size;
+                g.QTD_VISITAS = g.visitas;
+                delete g.setCargas;
+                delete g.setLotes;
+                delete g.visitas;
+                resultado.push(g);
+            }
+            return resultado;
+        }
+
+        // ========== SINCRONIZAÇÃO ==========
+        async function sincronizarTabela(tabela, chavesUnicas, registros, logElement) {
+            logElement.textContent = 'Verificando registros existentes...';
+            const existentesMap = new Map();
             let from = 0;
             const size = 1000;
             while (true) {
-                const { data, error } = await query.range(from, from + size - 1);
-                if (error) throw error;
-                if (data && data.length) {
-                    all = all.concat(data);
+                const { data, error } = await sb.from(tabela).select('*').range(from, from + size - 1);
+                if (error) {
+                    logElement.textContent += `\n❌ Erro ao buscar ${tabela}: ${error.message}`;
+                    return null;
                 }
+                (data || []).forEach(r => {
+                    const key = chavesUnicas.map(c => String(r[c])).join('|');
+                    existentesMap.set(key, r);
+                });
                 if (!data || data.length < size) break;
                 from += size;
             }
-            return all;
-        }
-
-        function buildPivot(records, config, metric, startDate, endDate, mapaHC) {
-            const rowsMap = new Map();
-            const sortedDates = gerarDatasDoPeriodo(startDate, endDate);
-            const datasPermitidas = new Set(sortedDates);
-
-            for (const rec of records) {
-                const dateValue = String(rec[config.dateCol] ?? '').slice(0, 10);
-                if (!datasPermitidas.has(dateValue)) continue;
-
-                const pessoa = valorColaborador(rec, config, mapaHC);
-                if (!pessoa.chave) continue;
-                if (!rowsMap.has(pessoa.chave)) {
-                    rowsMap.set(pessoa.chave, {
-                        MATRICULA: pessoa.matricula,
-                        NOME: pessoa.nome,
-                        CARGO: pessoa.cargo,
-                        _dates: new Map(),
-                        _highlightDates: new Map()
-                    });
-                }
-                const row = rowsMap.get(pessoa.chave);
-                if (!row.NOME && pessoa.nome) row.NOME = pessoa.nome;
-                if (!row.CARGO && pessoa.cargo) row.CARGO = pessoa.cargo;
-
-                const valor = numeroValido(rec[metric]);
-                if (valor !== null) {
-                    const atual = row._dates.get(dateValue);
-                    row._dates.set(dateValue, (Number.isFinite(atual) ? atual : 0) + valor);
-                } else if (!row._dates.has(dateValue)) {
-                    row._dates.set(dateValue, null);
-                }
-
-                if (config.highlightThreshold) {
-                    const valorMeta = numeroValido(rec[config.highlightThreshold.metric]);
-                    if (valorMeta !== null) {
-                        const atualMeta = row._highlightDates.get(dateValue);
-                        row._highlightDates.set(dateValue, (Number.isFinite(atualMeta) ? atualMeta : 0) + valorMeta);
-                    } else if (!row._highlightDates.has(dateValue)) {
-                        row._highlightDates.set(dateValue, null);
+            const inserir = [];
+            const atualizar = [];
+            const semAlteracao = [];
+            for (const reg of registros) {
+                const key = chavesUnicas.map(c => String(reg[c])).join('|');
+                const existente = existentesMap.get(key);
+                if (!existente) {
+                    inserir.push(reg);
+                } else {
+                    let igual = true;
+                    for (const col of Object.keys(reg)) {
+                        if (String(reg[col]) !== String(existente[col])) {
+                            igual = false;
+                            break;
+                        }
+                    }
+                    if (igual) {
+                        semAlteracao.push(reg);
+                    } else {
+                        atualizar.push(reg);
                     }
                 }
             }
+            for (let i = 0; i < inserir.length; i += 200) {
+                const lote = inserir.slice(i, i + 200);
+                const { error } = await sb.from(tabela).insert(lote);
+                if (error) {
+                    logElement.textContent += `\n❌ Erro no insert: ${error.message}`;
+                    return { inseridos: i, atualizados: 0, semAlteracao: 0, erros: inserir.length - i };
+                }
+            }
+            for (let i = 0; i < atualizar.length; i++) {
+                const reg = atualizar[i];
+                const filtros = {};
+                chavesUnicas.forEach(c => filtros[c] = reg[c]);
+                const { error } = await sb.from(tabela).update(reg).match(filtros);
+                if (error) {
+                    logElement.textContent += `\n❌ Erro no update: ${error.message}`;
+                    return { inseridos: inserir.length, atualizados: i, semAlteracao: semAlteracao.length, erros: atualizar.length - i };
+                }
+                if ((i + 1) % 25 === 0) logElement.textContent += `\nAtualizados: ${i + 1}/${atualizar.length}`;
+            }
+            return {
+                inseridos: inserir.length,
+                atualizados: atualizar.length,
+                semAlteracao: semAlteracao.length,
+                erros: 0
+            };
+        }
 
-            const rows = Array.from(rowsMap.values())
-                .sort((a, b) => String(a.NOME || '').localeCompare(String(b.NOME || ''), 'pt-BR'))
-                .map(row => {
-                    const result = {
-                        MATRICULA: row.MATRICULA,
-                        NOME: row.NOME,
-                        CARGO: row.CARGO,
-                        _dates: {},
-                        _highlightDates: {}
-                    };
-                    sortedDates.forEach(date => {
-                        result._dates[date] = row._dates.has(date) ? row._dates.get(date) : null;
-                        result._highlightDates[date] = row._highlightDates.has(date) ? row._highlightDates.get(date) : null;
+        // ========== UPLOADS ==========
+        async function uploadQuadro() {
+            const fileInput = document.getElementById('quadroFile');
+            const file = fileInput.files[0];
+            const log = document.getElementById('quadroLog');
+            log.textContent = 'Iniciando processamento...';
+            if (!file) { log.textContent = 'Nenhum arquivo selecionado.'; return; }
+            try {
+                const matriz = await lerArquivoComoMatriz(file);
+                log.textContent += `\nLinhas lidas: ${matriz.length}`;
+                if (matriz.length === 0) { log.textContent += '\nArquivo vazio.'; return; }
+                const registros = [];
+                let linhasIgnoradas = 0;
+                for (let i = 0; i < matriz.length; i++) {
+                    const linha = matriz[i];
+                    const col = (idx) => (linha[idx] || '').trim();
+                    const matricula = col(0);
+                    const textoLinha = linha
+                        .map(valor => String(valor ?? '').trim())
+                        .join(' ')
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '');
+                    const ehTituloOuCabecalho =
+                        /(^|\s)matricula(\s|$)/.test(textoLinha) ||
+                        (i < 3 && !/\d/.test(matricula)) ||
+                        (i < 3 && /\b(quadro|headcount|funcionario|colaborador|base)\b/.test(textoLinha));
+                    if (!matricula || ehTituloOuCabecalho) { linhasIgnoradas++; continue; }
+                    const nome = col(1);
+                    const dataAdmStr = col(2);
+                    const cargo = col(4);
+                    const estabelecimento = col(6);
+                    const centroCusto = col(8);
+                    const dataNascStr = col(9);
+                    const gestor = col(16);
+                    const situacao = col(20);
+                    const dataAfastStr = col(21);
+                    const dataRetornoStr = col(22);
+                    const motivoAfast = col(23);
+                    // TURNO vem da coluna T da planilha: T é a 20ª coluna, índice 19 no JavaScript.
+                    const turno = col(19);
+                    const idade = calcularIdade(dataNascStr);
+                    const tempoCasa = calcularTempoCasa(dataAdmStr);
+                    registros.push({
+                        Matricula: matricula,
+                        Nome: nome,
+                        'Data de admissão': dataAdmStr,
+                        'Tempo de casa': tempoCasa,
+                        'Descrição do cargo': cargo,
+                        'Nome do estabelecimento': estabelecimento,
+                        'Descrição do centro de custo': centroCusto,
+                        'Data de Nascimento': dataNascStr,
+                        Idade: idade,
+                        'Nome do gestor': gestor,
+                        'Descrição da situação': situacao,
+                        'Data afastamento': dataAfastStr,
+                        'Data de retorno': dataRetornoStr,
+                        'Motivo do afastamento': motivoAfast,
+                        TURNO: turno
                     });
-                    return result;
-                });
-            return { rows, dates: sortedDates };
+                }
+                log.textContent += `\nRegistros válidos: ${registros.length} | Ignorados (sem matrícula): ${linhasIgnoradas}`;
+                if (registros.length === 0) { log.textContent += '\nNenhum registro para enviar.'; return; }
+                log.textContent += '\nVerificando matrículas existentes...';
+                const hcExistentes = new Map();
+                let hcFrom = 0;
+                const hcSize = 1000;
+                while (true) {
+                    const { data: existentes, error: erroBusca } = await sb.from('HC').select('Matricula').range(hcFrom, hcFrom + hcSize - 1);
+                    if (erroBusca) { log.textContent += `\n❌ Erro ao consultar HC: ${erroBusca.message}`; return; }
+                    (existentes || []).forEach(r => { const mat = String(r.Matricula ?? '').trim(); if (mat) hcExistentes.set(mat, true); });
+                    if (!existentes || existentes.length < hcSize) break;
+                    hcFrom += hcSize;
+                }
+                const registrosExistentes = registros.filter(r => hcExistentes.has(String(r.Matricula).trim()));
+                const registrosNovos = registros.filter(r => !hcExistentes.has(String(r.Matricula).trim()));
+                log.textContent += `\nJá existentes: ${registrosExistentes.length} | Novos: ${registrosNovos.length}`;
+                for (let i = 0; i < registrosExistentes.length; i++) {
+                    const registro = registrosExistentes[i];
+                    const matricula = String(registro.Matricula).trim();
+                    const { error } = await sb.from('HC').update(registro).eq('Matricula', matricula);
+                    if (error) { log.textContent += `\n❌ Erro atualizando matrícula ${matricula}: ${error.message}`; return; }
+                    if ((i + 1) % 25 === 0 || i === registrosExistentes.length - 1) log.textContent += `\nAtualizados: ${i + 1}/${registrosExistentes.length}`;
+                }
+                for (let i = 0; i < registrosNovos.length; i += 200) {
+                    const lote = registrosNovos.slice(i, i + 200);
+                    log.textContent += `\nInserindo lote ${Math.floor(i/200)+1} (${lote.length} registros)...`;
+                    const { error } = await sb.from('HC').insert(lote);
+                    if (error) { log.textContent += `\n❌ Erro no insert: ${error.message}`; return; }
+                }
+                log.textContent += `\n✅ Quadro HC sincronizado. ${registrosExistentes.length} atualizados + ${registrosNovos.length} inseridos.`;
+            } catch (e) {
+                log.textContent += '\n❌ Erro: ' + (e.message || e);
+                console.error(e);
+            }
+        }
+        window.uploadQuadro = uploadQuadro;
+
+        function normalizarCabecalhoFerias(valor) {
+            return String(valor ?? '')
+                .trim()
+                .toUpperCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ');
         }
 
-        function valorExibicao(valor) {
-            const texto = String(valor ?? '').trim();
-            return texto || '-';
+        function normalizarDataFerias(valor) {
+            if (valor === null || valor === undefined || String(valor).trim() === '') return null;
+            if (typeof valor === 'number' && Number.isFinite(valor)) {
+                const partes = XLSX.SSF.parse_date_code(valor);
+                if (partes) {
+                    return `${partes.y}-${String(partes.m).padStart(2, '0')}-${String(partes.d).padStart(2, '0')}`;
+                }
+            }
+            const texto = String(valor).trim();
+            const br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (br) return `${br[3]}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}`;
+            const iso = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+            const data = new Date(texto);
+            if (!Number.isNaN(data.getTime())) {
+                return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
+            }
+            return null;
         }
 
-        function formatarNumero(valor) {
-            const numero = numeroValido(valor);
-            return numero === null ? '-' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Math.round(numero));
-        }
+        async function uploadFerias() {
+            const file = document.getElementById('feriasFile').files[0];
+            const log = document.getElementById('feriasLog');
+            log.textContent = 'Processando base Férias...';
+            if (!file) { log.textContent = 'Nenhum arquivo selecionado.'; return; }
+            try {
+                const matriz = await lerArquivoComoMatriz(file);
+                if (!matriz.length) { log.textContent = 'Arquivo vazio.'; return; }
 
-        function deveDestacarDia(row, date, config) {
-            const meta = config.highlightThreshold;
-            const numero = numeroValido(row._highlightDates?.[date]);
-            return Boolean(meta && numero !== null && numero >= meta.value);
-        }
-
-        function renderTable(pivot, fixedCols, config, metric) {
-            const { rows, dates } = pivot;
-            const nomesColunas = { MATRICULA: 'MATRÍCULA', NOME: 'NOME', CARGO: 'CARGO' };
-            let thead = '<tr>';
-            fixedCols.forEach(c => thead += `<th>${nomesColunas[c] || c}</th>`);
-            dates.forEach(d => {
-                const parts = d.split('-');
-                thead += `<th>${parts[2]}/${parts[1]}</th>`;
-            });
-            thead += '</tr>';
-            document.getElementById('theadProd').innerHTML = thead;
-
-            let tbody = '';
-            rows.forEach(row => {
-                tbody += '<tr>';
-                fixedCols.forEach(c => tbody += `<td>${valorExibicao(row[c])}</td>`);
-                dates.forEach(d => {
-                    const val = row._dates[d];
-                    const classeMeta = deveDestacarDia(row, d, config) ? ' class="meta-atingida"' : '';
-                    tbody += `<td${classeMeta}>${formatarNumero(val)}</td>`;
-                });
-                tbody += '</tr>';
-            });
-            document.getElementById('tbodyProd').innerHTML = tbody || `<tr><td colspan="${fixedCols.length + dates.length}">Nenhum dado encontrado.</td></tr>`;
-        }
-
-        function renderCards(pivot, metric) {
-            const { rows, dates } = pivot;
-            let total = 0;
-            let count = 0;
-            let min = Infinity;
-            let max = -Infinity;
-
-            rows.forEach(row => {
-                dates.forEach(d => {
-                    const val = numeroValido(row._dates[d]);
-                    if (val !== null) {
-                        total += val;
-                        count++;
-                        if (val < min) min = val;
-                        if (val > max) max = val;
+                let indiceCabecalho = -1;
+                let mapaColunas = null;
+                for (let i = 0; i < Math.min(matriz.length, 10); i++) {
+                    const mapa = {};
+                    matriz[i].forEach((valor, indice) => { mapa[normalizarCabecalhoFerias(valor)] = indice; });
+                    if (mapa.MATRICULA !== undefined && mapa['DATA INICIO'] !== undefined && mapa['DATA FIM'] !== undefined) {
+                        indiceCabecalho = i;
+                        mapaColunas = mapa;
+                        break;
                     }
-                });
-            });
+                }
+                if (indiceCabecalho < 0) {
+                    log.textContent = '❌ Não encontrei as colunas MATRICULA, DATA INICIO e DATA FIM.';
+                    return;
+                }
 
-            const semDados = count === 0;
-            const avg = count > 0 ? (total / count) : null;
-            const cards = [
-                { label: 'Média', value: semDados ? '-' : formatarNumero(avg) },
-                { label: 'Total', value: semDados ? '-' : formatarNumero(total) },
-                { label: 'Máximo', value: semDados ? '-' : formatarNumero(max) },
-                { label: 'Mínimo', value: semDados ? '-' : formatarNumero(min) }
-            ];
+                const registros = [];
+                let linhasIgnoradas = 0;
+                for (let i = indiceCabecalho + 1; i < matriz.length; i++) {
+                    const linha = matriz[i];
+                    const matricula = String(linha[mapaColunas.MATRICULA] ?? '').trim();
+                    const inicio = normalizarDataFerias(linha[mapaColunas['DATA INICIO']]);
+                    const fim = normalizarDataFerias(linha[mapaColunas['DATA FIM']]);
+                    if (!matricula || !inicio || !fim || inicio > fim) {
+                        linhasIgnoradas++;
+                        continue;
+                    }
+                    registros.push({
+                        MATRICULA: matricula,
+                        'DATA INICIO': inicio,
+                        'DATA FIM': fim
+                    });
+                }
+                if (!registros.length) {
+                    log.textContent = `Nenhum registro válido encontrado. Linhas ignoradas: ${linhasIgnoradas}`;
+                    return;
+                }
 
-            document.getElementById('cardsContainer').innerHTML = cards.map(c => `
-                <div class="metric-card">
-                    <div class="metric-label">${c.label}</div>
-                    <div class="metric-value">${c.value}</div>
-                </div>
-            `).join('');
+                const resultado = await sincronizarTabela(
+                    'Férias',
+                    ['MATRICULA', 'DATA INICIO', 'DATA FIM'],
+                    registros,
+                    log
+                );
+                if (!resultado) return;
+                log.textContent += `\n✅ Férias sincronizadas: ${resultado.inseridos} inseridos, ${resultado.atualizados} atualizados, ${resultado.semAlteracao} sem alteração.`;
+                log.textContent += `\nLinhas ignoradas: ${linhasIgnoradas}`;
+            } catch (e) {
+                log.textContent = '❌ Erro: ' + (e.message || e);
+                console.error(e);
+            }
+        }
+        window.uploadFerias = uploadFerias;
+
+        async function uploadSuricato() {
+            const file = document.getElementById('suricatoFile').files[0]; if (!file) return;
+            const log = document.getElementById('suricatoLog'); log.textContent = 'Processando...';
+            try {
+                const matriz = await lerArquivoComoMatriz(file);
+                const linhas = matriz;
+                const registros = [];
+                for (let i=0; i<linhas.length; i++) {
+                    const linha = linhas[i];
+                    if (linha.length < 5) continue;
+                    const col0 = (linha[0] || '').trim();
+                    const col4 = (linha[4] || '').trim();
+                    if (!col0 || !col4) continue;
+                    const match = col0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+                    if (!match) continue;
+                    const [_, dd, mm, yyyy, hh, min, ss] = match;
+                    const dtaISO = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    const hr = `${hh.padStart(2, '0')}:${min}:${ss || '00'}`;
+                    // Mantém todos os registros e não remove intervalos repetidos.
+                    registros.push({ DTA: dtaISO, HR: hr, MATRICULA: col4 });
+                }
+                if (!registros.length) {
+                    log.textContent = 'Nenhum registro válido para enviar.';
+                    return;
+                }
+                for (let i = 0; i < registros.length; i += 200) {
+                    const lote = registros.slice(i, i + 200);
+                    const { error } = await sb.from('SURICATO').insert(lote);
+                    if (error) {
+                        log.textContent = `❌ Erro no insert do lote ${Math.floor(i / 200) + 1}: ${error.message}`;
+                        return;
+                    }
+                    log.textContent = `Enviados: ${Math.min(i + lote.length, registros.length)}/${registros.length}`;
+                }
+                log.textContent = `✅ ${registros.length} registros enviados para SURICATO, sem deduplicação.`;
+            } catch (e) { log.textContent = '❌ '+e.message; }
+        }
+        window.uploadSuricato = uploadSuricato;
+
+        async function processarPastaREC(files) {
+            const log = document.getElementById('recLog');
+            log.textContent = 'Processando arquivos REC...';
+            const arquivos = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.txt'));
+            log.textContent += `\nArquivos TXT encontrados: ${arquivos.length}`;
+            if (arquivos.length === 0) { log.textContent += '\nNenhum arquivo TXT encontrado.'; return; }
+            let registrosLidos = 0;
+            let registrosValidos = 0;
+            const todos = [];
+            const diagnosticoTotal = { semData: 0, semHora: 0, dataInvalida: 0, horaInvalida: 0, aceitos: 0 };
+            for (const file of arquivos) {
+                try {
+                    const text = await lerArquivoTXT(file);
+                    const rows = parseTXT(
+                        text,
+                        ['INICIOCONF_DATA', 'INICIOCONF_HORA'],
+                        COLUNAS_REC_ORDEM
+                    );
+                    registrosLidos += rows.length;
+                    const diagnosticoArquivo = { semData: 0, semHora: 0, dataInvalida: 0, horaInvalida: 0, aceitos: 0 };
+                    const processados = processarDadosRecNew(rows, diagnosticoArquivo);
+                    Object.keys(diagnosticoTotal).forEach(k => diagnosticoTotal[k] += diagnosticoArquivo[k]);
+                    registrosValidos += processados.length;
+                    todos.push(...processados);
+                    log.textContent += `\n✔ ${file.name}: ${processados.length} registros válidos | linhas lidas: ${rows.length}`;
+                    if (rows.length === 0) log.textContent += ' | parser não encontrou linhas com o cabeçalho/ordem REC';
+                    else if (processados.length === 0) {
+                        const primeira = rows[0] || {};
+                        const colunasDetectadas = Object.keys(primeira).join(',');
+                        const dataBruta = obterCampoRec(primeira, 'INICIOCONF_DATA');
+                        const horaBruta = obterCampoRec(primeira, 'INICIOCONF_HORA');
+                        log.textContent += ` | sem data: ${diagnosticoArquivo.semData}, sem hora: ${diagnosticoArquivo.semHora}, data inválida: ${diagnosticoArquivo.dataInvalida}, hora inválida: ${diagnosticoArquivo.horaInvalida}`;
+                        log.textContent += ` | colunas: ${colunasDetectadas} | data bruta: [${dataBruta}] | hora bruta: [${horaBruta}]`;
+                    }
+                } catch (e) {
+                    log.textContent += `\n❌ Erro no arquivo ${file.name}: ${e.message}`;
+                }
+            }
+            if (todos.length === 0) {
+                log.textContent += `\n\nDiagnóstico total: linhas lidas ${registrosLidos}; sem data ${diagnosticoTotal.semData}; sem hora ${diagnosticoTotal.semHora}; data inválida ${diagnosticoTotal.dataInvalida}; hora inválida ${diagnosticoTotal.horaInvalida}.`;
+                log.textContent += '\nNenhum registro válido para sincronizar.';
+                return;
+            }
+            showLoading();
+            const resultado = await sincronizarTabela('RECEB.', ['DTA', 'TURNO', 'COND_CONF', 'CONFERENTE'], todos, log);
+            hideLoading();
+            log.textContent += `\n\nResumo:`;
+            log.textContent += `\nArquivos encontrados: ${arquivos.length}`;
+            log.textContent += `\nArquivos processados: ${arquivos.length}`;
+            log.textContent += `\nRegistros lidos: ${registrosLidos}`;
+            log.textContent += `\nRegistros válidos: ${registrosValidos}`;
+            log.textContent += `\nRegistros inseridos: ${resultado?.inseridos ?? 0}`;
+            log.textContent += `\nRegistros atualizados: ${resultado?.atualizados ?? 0}`;
+            log.textContent += `\nRegistros sem alteração: ${resultado?.semAlteracao ?? 0}`;
+            log.textContent += `\nRegistros com erro: ${resultado?.erros ?? 0}`;
         }
 
-        function inicializarProdutividade() {
-            construirFiltros();
-            construirMetrica();
-            carregarDadosProd();
+        async function processarPastaVT(files) {
+            const log = document.getElementById('vtLog');
+            log.textContent = 'Processando arquivos VT_HR...';
+            const arquivos = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.txt'));
+            log.textContent += `\nArquivos TXT encontrados: ${arquivos.length}`;
+            if (arquivos.length === 0) { log.textContent += '\nNenhum arquivo TXT encontrado.'; return; }
+            let registrosLidos = 0;
+            let registrosValidos = 0;
+            const todos = [];
+            for (const file of arquivos) {
+                try {
+                    const text = await lerArquivoTXT(file);
+                    const rows = parseTXT(text);
+                    registrosLidos += rows.length;
+                    const processados = processarVT_HR(rows);
+                    registrosValidos += processados.length;
+                    todos.push(...processados);
+                    log.textContent += `\n✔ ${file.name}: ${processados.length} registros válidos`;
+                } catch (e) {
+                    log.textContent += `\n❌ Erro no arquivo ${file.name}: ${e.message}`;
+                }
+            }
+            if (todos.length === 0) { log.textContent += '\nNenhum registro válido para sincronizar.'; return; }
+            showLoading();
+            const resultado = await sincronizarTabela('VT_HR', ['DTA_PROD', 'TURNO_PROD', 'CODPRODUTIVO', 'PRODUTIVO', 'ATIVIDADE'], todos, log);
+            hideLoading();
+            log.textContent += `\n\nResumo:`;
+            log.textContent += `\nArquivos encontrados: ${arquivos.length}`;
+            log.textContent += `\nArquivos processados: ${arquivos.length}`;
+            log.textContent += `\nRegistros lidos: ${registrosLidos}`;
+            log.textContent += `\nRegistros válidos: ${registrosValidos}`;
+            log.textContent += `\nRegistros inseridos: ${resultado?.inseridos ?? 0}`;
+            log.textContent += `\nRegistros atualizados: ${resultado?.atualizados ?? 0}`;
+            log.textContent += `\nRegistros sem alteração: ${resultado?.semAlteracao ?? 0}`;
+            log.textContent += `\nRegistros com erro: ${resultado?.erros ?? 0}`;
         }
 
-        // Restaura sessão
+        async function processarPastaPLT(files) {
+            const log = document.getElementById('pltLog');
+            log.textContent = 'Processando arquivos PLT_FECH...';
+            const arquivos = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.txt'));
+            log.textContent += `\nArquivos TXT encontrados: ${arquivos.length}`;
+            if (arquivos.length === 0) { log.textContent += '\nNenhum arquivo TXT encontrado.'; return; }
+            let registrosLidos = 0;
+            let registrosValidos = 0;
+            const todos = [];
+            for (const file of arquivos) {
+                try {
+                    const text = await lerArquivoTXT(file);
+                    const rows = parseTXT(text);
+                    registrosLidos += rows.length;
+                    const processados = processarPLT_FECH(rows);
+                    registrosValidos += processados.length;
+                    todos.push(...processados);
+                    log.textContent += `\n✔ ${file.name}: ${processados.length} registros válidos`;
+                } catch (e) {
+                    log.textContent += `\n❌ Erro no arquivo ${file.name}: ${e.message}`;
+                }
+            }
+            if (todos.length === 0) { log.textContent += '\nNenhum registro válido para sincronizar.'; return; }
+            showLoading();
+            const chaves = ['DTA_INI', 'DTA_FAT', 'TURNO_FAT', 'TURNO_PROD', 'STATUS', 'LINHASEPAR', 'CODPRODUTIVO', 'PRODUTIVO', 'PLTFECHADO'];
+            const resultado = await sincronizarTabela('PLT_FECH', chaves, todos, log);
+            hideLoading();
+            log.textContent += `\n\nResumo:`;
+            log.textContent += `\nArquivos encontrados: ${arquivos.length}`;
+            log.textContent += `\nArquivos processados: ${arquivos.length}`;
+            log.textContent += `\nRegistros lidos: ${registrosLidos}`;
+            log.textContent += `\nRegistros válidos: ${registrosValidos}`;
+            log.textContent += `\nRegistros inseridos: ${resultado?.inseridos ?? 0}`;
+            log.textContent += `\nRegistros atualizados: ${resultado?.atualizados ?? 0}`;
+            log.textContent += `\nRegistros sem alteração: ${resultado?.semAlteracao ?? 0}`;
+            log.textContent += `\nRegistros com erro: ${resultado?.erros ?? 0}`;
+        }
+
+        document.getElementById('recFolderInput').addEventListener('change', (e) => {
+            processarPastaREC(e.target.files);
+            e.target.value = '';
+        });
+        document.getElementById('vtFolderInput').addEventListener('change', (e) => {
+            processarPastaVT(e.target.files);
+            e.target.value = '';
+        });
+        document.getElementById('pltFolderInput').addEventListener('change', (e) => {
+            processarPastaPLT(e.target.files);
+            e.target.value = '';
+        });
+
+        // ========== RESTAURAÇÃO DE SESSÃO ==========
+        function getUrlParameter(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const session = sessionStorage.getItem('hc_user');
+            const pageParam = getUrlParameter('page');
             if (session) {
                 try {
                     currentUser = JSON.parse(session);
                     aplicarUI();
                     document.getElementById('loginOverlay').style.display = 'none';
-                    inicializarProdutividade();
+                    if (pageParam === 'bases' || pageParam === 'usuarios') {
+                        navegar(pageParam);
+                    } else {
+                        navegar('home');
+                    }
                 } catch (e) {
                     sessionStorage.removeItem('hc_user');
                 }
