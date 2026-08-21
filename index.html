@@ -376,9 +376,9 @@
         document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => {
             const page = n.dataset.page;
             if (page === 'absenteismo') {
-                window.location.href = 'abs.html';
+                window.location.assign(new URL('./abs.html', document.baseURI).href);
             } else if (page === 'produtividade') {
-                window.location.href = 'produtividade.html';
+                window.location.assign(new URL('./produtividade.html', document.baseURI).href);
             } else {
                 navegar(page);
             }
