@@ -105,6 +105,8 @@
         th { position:sticky; top:0; z-index:20; background:#172532; padding:8px 6px; text-align:center; font-weight:700; font-size:.60rem; text-transform:uppercase; color:#d7e4ef; border-bottom:2px solid #1677c8; letter-spacing:.35px; }
         td { padding:6px 6px; text-align:center; border-bottom:1px solid #e4e9ef; font-family:var(--mono); font-weight:600; }
         tbody tr:hover td { background:#f1f7fb; }
+        .meta-atingida { background:#b7e4c7 !important; color:#14532d; font-weight:800; }
+        .dark-mode .meta-atingida { background:#86efac !important; color:#064e3b; }
         .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: var(--blue); color: white; display: inline-flex; align-items: center; gap: 6px; }
         .btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
     </style>
@@ -189,6 +191,22 @@
 
         let currentUser = null;
         let operacaoAtual = 'RECEBIMENTO';
+        let ultimaRequisicao = 0;
+        let timerPesquisa = null;
+        let mapaHCCache = null;
+        let mapaHCPromise = null;
+        const metricasSelecionadas = {};
+        const dadosCache = new Map();
+        const CACHE_TTL_MS = 30000;
+        const estadoFiltros = {
+            dataInicio: '',
+            dataFim: '',
+            turnoFilter: '',
+            turno2Filter: '',
+            statusFilter: '',
+            buscaInput: '',
+            metric: ''
+        };
 
         const viewConfigs = {
             RECEBIMENTO: {
@@ -197,15 +215,17 @@
                 personFields: { matricula: 'COND_CONF', nome: 'CONFERENTE' },
                 dateCol: 'DTA',
                 metrics: ['QTD_CARGAS'],
+                defaultMetric: 'QTD_CARGAS',
                 metricType: 'fixed',
                 filters: {
+                    cargo: 'CONFERENTE',
                     turno: 'TURNO',
                     turnoLabel: 'Turno',
                     status: false,
                     searchFields: ['CONFERENTE'],
                     numericSearchFields: ['COND_CONF']
                 },
-                extraCondition: null
+                extraCondition: { field: 'CONFERENTE', notEqual: 'AAA VIRTUAL' }
             },
             VERTICAL: {
                 table: 'VT_HR',
@@ -213,8 +233,10 @@
                 personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_PROD',
                 metrics: ['QTD_PESO', 'QTD_PLT'],
+                defaultMetric: 'QTD_PLT',
                 metricType: 'select',
                 filters: {
+                    cargo: 'OPERADOR EMPILHADEIRA CD',
                     turno: 'TURNO_PROD',
                     turnoLabel: 'Turno',
                     status: false,
@@ -229,8 +251,10 @@
                 personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_PROD',
                 metrics: ['QTD_PESO', 'QTD_PLT'],
+                defaultMetric: 'QTD_PLT',
                 metricType: 'select',
                 filters: {
+                    cargo: 'OPERADOR CD',
                     turno: 'TURNO_PROD',
                     turnoLabel: 'Turno',
                     status: false,
@@ -245,8 +269,11 @@
                 personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_INI',
                 metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
+                defaultMetric: 'QTD_CXS',
                 metricType: 'select',
+                highlightThreshold: { metric: 'QTD_CXS', value: 800 },
                 filters: {
+                    cargo: 'SEPARADOR CD',
                     turno: 'TURNO_FAT',
                     turnoLabel: 'Turno Fat',
                     turno2: 'TURNO_PROD',
@@ -255,7 +282,7 @@
                     searchFields: ['PRODUTIVO'],
                     numericSearchFields: ['CODPRODUTIVO']
                 },
-                extraCondition: { field: 'PLTFECHADO', values: ['SEPARAÇÃO', 'NÃO', 'NAO', 'N O'] }
+                extraCondition: { field: 'PLTFECHADO', notEqual: 'CONFERENTE' }
             },
             EXPEDICAO: {
                 table: 'PLT_FECH',
@@ -263,8 +290,10 @@
                 personFields: { matricula: 'CODPRODUTIVO', nome: 'PRODUTIVO' },
                 dateCol: 'DTA_INI',
                 metrics: ['QTD_CARGAS', 'QTD_LOTES', 'QTD_VISITAS', 'QTD_CXS'],
+                defaultMetric: 'QTD_CARGAS',
                 metricType: 'select',
                 filters: {
+                    cargo: 'CONFERENTE',
                     turno: 'TURNO_FAT',
                     turnoLabel: 'Turno Fat',
                     turno2: 'TURNO_PROD',
@@ -318,6 +347,12 @@
             document.getElementById('userInfo').style.display = 'none';
         }
 
+        function abrirMenuPrincipal(page) {
+            const url = new URL('index.html', window.location.href);
+            url.searchParams.set('page', page);
+            window.location.assign(url.href);
+        }
+
         // Navegação lateral
         document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => {
             const page = n.dataset.page;
@@ -325,10 +360,8 @@
                 window.location.href = 'abs.html';
             } else if (page === 'produtividade') {
                 // já está aqui
-            } else if (page === 'bases') {
-                window.location.href = 'index.html?page=bases';
-            } else if (page === 'usuarios') {
-                window.location.href = 'index.html?page=usuarios';
+            } else if (page === 'bases' || page === 'usuarios') {
+                abrirMenuPrincipal(page);
             }
         }));
 
@@ -338,7 +371,27 @@
             document.getElementById('themeToggle').innerHTML = d ? '<i class="fa-solid fa-sun"></i><span>Modo Claro</span>' : '<i class="fa-solid fa-moon"></i><span>Modo Escuro</span>';
         });
 
+        function capturarEstadoFiltros() {
+            ['dataInicio', 'dataFim', 'turnoFilter', 'turno2Filter', 'statusFilter', 'buscaInput'].forEach(id => {
+                const elemento = document.getElementById(id);
+                if (elemento) estadoFiltros[id] = elemento.value;
+            });
+            const metricSelect = document.getElementById('metricSelect');
+            if (metricSelect) {
+                estadoFiltros.metric = metricSelect.value;
+                metricasSelecionadas[operacaoAtual] = metricSelect.value;
+            }
+        }
+
+        function agendarCarregamento() {
+            capturarEstadoFiltros();
+            clearTimeout(timerPesquisa);
+            timerPesquisa = setTimeout(() => carregarDadosProd(), 250);
+        }
+        window.agendarCarregamento = agendarCarregamento;
+
         function trocarOperacao(op) {
+            capturarEstadoFiltros();
             operacaoAtual = op;
             document.querySelectorAll('.prod-selector .btn').forEach(b => b.classList.remove('active'));
             document.querySelector(`.prod-selector .btn[data-op="${op}"]`).classList.add('active');
@@ -351,14 +404,19 @@
         function construirFiltros() {
             const config = viewConfigs[operacaoAtual];
             const container = document.getElementById('filtersContainer');
+            const periodoPadrao = obterPeriodoPadrao();
+            const dataInicio = estadoFiltros.dataInicio || periodoPadrao.inicio;
+            const dataFim = estadoFiltros.dataFim || periodoPadrao.fim;
+            if (!estadoFiltros.dataInicio) estadoFiltros.dataInicio = dataInicio;
+            if (!estadoFiltros.dataFim) estadoFiltros.dataFim = dataFim;
             let html = `
                 <div class="filter-group">
                     <label>De:</label>
-                    <input type="date" id="dataInicio" onchange="carregarDadosProd()">
+                    <input type="date" id="dataInicio" value="${dataInicio}" onchange="carregarDadosProd()">
                 </div>
                 <div class="filter-group">
                     <label>Até:</label>
-                    <input type="date" id="dataFim" onchange="carregarDadosProd()">
+                    <input type="date" id="dataFim" value="${dataFim}" onchange="carregarDadosProd()">
                 </div>
             `;
             if (config.filters.turno) {
@@ -389,31 +447,42 @@
                 html += `
                 <div class="filter-group">
                     <label>Status</label>
-                    <input type="text" id="statusFilter" placeholder="Status" oninput="carregarDadosProd()">
+                    <input type="text" id="statusFilter" placeholder="Status" oninput="agendarCarregamento()">
                 </div>`;
             }
             html += `
                 <div class="filter-group">
-                    <label>Busca</label>
-                    <input type="text" id="buscaInput" placeholder="Busca..." oninput="carregarDadosProd()" style="min-width:200px;">
+                    <label>Colaborador</label>
+                    <input type="text" id="buscaInput" placeholder="Nome ou matrícula..." oninput="agendarCarregamento()" style="min-width:200px;">
                 </div>
             `;
             container.innerHTML = html;
 
-            // Definir datas padrão (hoje)
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('dataInicio').value = hoje;
-            document.getElementById('dataFim').value = hoje;
+            const turno = document.getElementById('turnoFilter');
+            const turno2 = document.getElementById('turno2Filter');
+            const status = document.getElementById('statusFilter');
+            const busca = document.getElementById('buscaInput');
+            if (turno) turno.value = estadoFiltros.turnoFilter || '';
+            if (turno2) turno2.value = estadoFiltros.turno2Filter || '';
+            if (status) status.value = estadoFiltros.statusFilter || '';
+            if (busca) busca.value = estadoFiltros.buscaInput || '';
         }
 
         function construirMetrica() {
             const config = viewConfigs[operacaoAtual];
             const container = document.getElementById('metricContainer');
             if (config.metricType === 'fixed') {
+                estadoFiltros.metric = config.metrics[0];
+                metricasSelecionadas[operacaoAtual] = config.metrics[0];
                 container.innerHTML = `<label>Métrica:</label><span style="font-family:var(--mono);">${config.metrics[0]}</span>`;
             } else {
                 const options = config.metrics.map(m => `<option value="${m}">${m}</option>`).join('');
                 container.innerHTML = `<label>Métrica:</label><select id="metricSelect" onchange="carregarDadosProd()">${options}</select>`;
+                const metricSelect = document.getElementById('metricSelect');
+                const metricSalva = metricasSelecionadas[operacaoAtual] || config.defaultMetric || config.metrics[0];
+                metricSelect.value = config.metrics.includes(metricSalva) ? metricSalva : config.metrics[0];
+                estadoFiltros.metric = metricSelect.value;
+                metricasSelecionadas[operacaoAtual] = metricSelect.value;
             }
         }
 
@@ -425,6 +494,15 @@
 
         function formatarDataLocal(data) {
             return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
+        }
+
+        function obterPeriodoPadrao() {
+            const agora = new Date();
+            const primeiroDia = new Date(agora.getFullYear(), agora.getMonth(), 1);
+            return {
+                inicio: formatarDataLocal(primeiroDia),
+                fim: formatarDataLocal(agora)
+            };
         }
 
         function gerarDatasDoPeriodo(inicio, fim) {
@@ -439,18 +517,53 @@
         }
 
         async function carregarMapaColaboradores() {
-            const mapa = new Map();
+            if (mapaHCCache) return mapaHCCache;
+            if (mapaHCPromise) return mapaHCPromise;
+
+            mapaHCPromise = (async () => {
+                const mapa = new Map();
+                try {
+                    const registrosHC = await fetchAll(sb.from('HC').select('*'));
+                    (registrosHC || []).forEach(reg => {
+                        const matricula = reg.Matricula ?? reg.MATRICULA ?? reg.CODPRODUTIVO;
+                        const chave = normalizarMatricula(matricula);
+                        if (chave) mapa.set(chave, reg);
+                    });
+                } catch (e) {
+                    console.warn('Não foi possível carregar o cadastro HC para complementar cargo:', e.message);
+                }
+                mapaHCCache = mapa;
+                return mapa;
+            })();
+
             try {
-                const registrosHC = await fetchAll(sb.from('HC').select('*'));
-                (registrosHC || []).forEach(reg => {
-                    const matricula = reg.Matricula ?? reg.MATRICULA ?? reg.CODPRODUTIVO;
-                    const chave = normalizarMatricula(matricula);
-                    if (chave) mapa.set(chave, reg);
-                });
-            } catch (e) {
-                console.warn('Não foi possível carregar o cadastro HC para complementar cargo:', e.message);
+                return await mapaHCPromise;
+            } finally {
+                mapaHCPromise = null;
             }
-            return mapa;
+        }
+
+        function montarColunasConsulta(config) {
+            const colunas = [
+                config.dateCol,
+                ...(config.metrics || []),
+                ...(Object.values(config.personFields || {})),
+                config.filters.cargo,
+                config.filters.turno,
+                config.filters.turno2,
+                config.filters.status ? 'STATUS' : null,
+                ...(config.filters.searchFields || []),
+                ...(config.filters.numericSearchFields || []),
+                config.extraCondition?.field
+            ];
+            return [...new Set(colunas.filter(Boolean))].join(',');
+        }
+
+        function numeroValido(valor) {
+            if (valor === null || valor === undefined) return null;
+            if (typeof valor === 'string' && valor.trim() === '') return null;
+            const numero = Number(valor);
+            return Number.isFinite(numero) ? numero : null;
         }
 
         function valorColaborador(registro, config, mapaHC) {
@@ -469,15 +582,19 @@
 
         async function carregarDadosProd() {
             if (!currentUser) return;
+            capturarEstadoFiltros();
+            const requestId = ++ultimaRequisicao;
             const config = viewConfigs[operacaoAtual];
             const dateCol = config.dateCol;
             const startDate = document.getElementById('dataInicio').value;
             const endDate = document.getElementById('dataFim').value;
 
             if (!startDate || !endDate) {
-                const hoje = new Date().toISOString().split('T')[0];
-                document.getElementById('dataInicio').value = hoje;
-                document.getElementById('dataFim').value = hoje;
+                const periodoPadrao = obterPeriodoPadrao();
+                document.getElementById('dataInicio').value = periodoPadrao.inicio;
+                document.getElementById('dataFim').value = periodoPadrao.fim;
+                estadoFiltros.dataInicio = periodoPadrao.inicio;
+                estadoFiltros.dataFim = periodoPadrao.fim;
                 return carregarDadosProd();
             }
             if (startDate > endDate) {
@@ -490,17 +607,33 @@
             const statusFilter = config.filters.status ? document.getElementById('statusFilter')?.value : null;
             const busca = document.getElementById('buscaInput')?.value.trim() || '';
             const metric = config.metricType === 'fixed' ? config.metrics[0] : document.getElementById('metricSelect')?.value;
+            const cacheKey = JSON.stringify({
+                operacaoAtual,
+                startDate,
+                endDate,
+                turnoFilter,
+                turno2Filter,
+                statusFilter,
+                busca,
+                metric
+            });
 
             showLoading();
             try {
-                let query = sb.from(config.table).select('*')
+                let query = sb.from(config.table).select(montarColunasConsulta(config))
                     .gte(dateCol, startDate)
                     .lte(dateCol, endDate);
 
+                if (config.filters.cargo) query = query.eq('CARGO', config.filters.cargo);
+
                 if (config.extraCondition) {
-                    query = config.extraCondition.values
-                        ? query.in(config.extraCondition.field, config.extraCondition.values)
-                        : query.eq(config.extraCondition.field, config.extraCondition.value);
+                    if (config.extraCondition.values) {
+                        query = query.in(config.extraCondition.field, config.extraCondition.values);
+                    } else if (config.extraCondition.notEqual !== undefined) {
+                        query = query.neq(config.extraCondition.field, config.extraCondition.notEqual);
+                    } else {
+                        query = query.eq(config.extraCondition.field, config.extraCondition.value);
+                    }
                 }
                 if (turnoFilter) query = query.eq(config.filters.turno, turnoFilter);
                 if (turno2Filter) query = query.eq(config.filters.turno2, turno2Filter);
@@ -516,16 +649,25 @@
                     if (orParts) query = query.or(orParts);
                 }
 
-                const [allData, mapaHC] = await Promise.all([fetchAll(query), carregarMapaColaboradores()]);
+                const cacheAtual = dadosCache.get(cacheKey);
+                const dadosPromise = cacheAtual && Date.now() - cacheAtual.timestamp < CACHE_TTL_MS
+                    ? Promise.resolve(cacheAtual.data)
+                    : fetchAll(query).then(data => {
+                        dadosCache.set(cacheKey, { timestamp: Date.now(), data });
+                        return data;
+                    });
+                const [allData, mapaHC] = await Promise.all([dadosPromise, carregarMapaColaboradores()]);
+                if (requestId !== ultimaRequisicao) return;
                 const pivot = buildPivot(allData, config, metric, startDate, endDate, mapaHC);
-                renderTable(pivot, config.fixedCols);
+                renderTable(pivot, config.fixedCols, config, metric);
                 renderCards(pivot, metric);
             } catch (e) {
+                if (requestId !== ultimaRequisicao) return;
                 console.error(e);
                 document.getElementById('tbodyProd').innerHTML = `<tr><td colspan="20">Erro ao consultar o Supabase: ${e.message}</td></tr>`;
                 document.getElementById('cardsContainer').innerHTML = '';
             } finally {
-                hideLoading();
+                if (requestId === ultimaRequisicao) hideLoading();
             }
         }
         window.carregarDadosProd = carregarDadosProd;
@@ -562,28 +704,69 @@
                         MATRICULA: pessoa.matricula,
                         NOME: pessoa.nome,
                         CARGO: pessoa.cargo,
-                        _dates: new Map()
+                        _dates: new Map(),
+                        _highlightDates: new Map()
                     });
                 }
                 const row = rowsMap.get(pessoa.chave);
                 if (!row.NOME && pessoa.nome) row.NOME = pessoa.nome;
                 if (!row.CARGO && pessoa.cargo) row.CARGO = pessoa.cargo;
-                const atual = row._dates.get(dateValue) || 0;
-                const valor = Number(rec[metric]);
-                row._dates.set(dateValue, atual + (Number.isFinite(valor) ? valor : 0));
+
+                const valor = numeroValido(rec[metric]);
+                if (valor !== null) {
+                    const atual = row._dates.get(dateValue);
+                    row._dates.set(dateValue, (Number.isFinite(atual) ? atual : 0) + valor);
+                } else if (!row._dates.has(dateValue)) {
+                    row._dates.set(dateValue, null);
+                }
+
+                if (config.highlightThreshold) {
+                    const valorMeta = numeroValido(rec[config.highlightThreshold.metric]);
+                    if (valorMeta !== null) {
+                        const atualMeta = row._highlightDates.get(dateValue);
+                        row._highlightDates.set(dateValue, (Number.isFinite(atualMeta) ? atualMeta : 0) + valorMeta);
+                    } else if (!row._highlightDates.has(dateValue)) {
+                        row._highlightDates.set(dateValue, null);
+                    }
+                }
             }
 
             const rows = Array.from(rowsMap.values())
                 .sort((a, b) => String(a.NOME || '').localeCompare(String(b.NOME || ''), 'pt-BR'))
                 .map(row => {
-                    const result = { MATRICULA: row.MATRICULA, NOME: row.NOME, CARGO: row.CARGO, _dates: {} };
-                    sortedDates.forEach(date => { result._dates[date] = row._dates.get(date) || 0; });
+                    const result = {
+                        MATRICULA: row.MATRICULA,
+                        NOME: row.NOME,
+                        CARGO: row.CARGO,
+                        _dates: {},
+                        _highlightDates: {}
+                    };
+                    sortedDates.forEach(date => {
+                        result._dates[date] = row._dates.has(date) ? row._dates.get(date) : null;
+                        result._highlightDates[date] = row._highlightDates.has(date) ? row._highlightDates.get(date) : null;
+                    });
                     return result;
                 });
             return { rows, dates: sortedDates };
         }
 
-        function renderTable(pivot, fixedCols) {
+        function valorExibicao(valor) {
+            const texto = String(valor ?? '').trim();
+            return texto || '-';
+        }
+
+        function formatarNumero(valor) {
+            const numero = numeroValido(valor);
+            return numero === null ? '-' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Math.round(numero));
+        }
+
+        function deveDestacarDia(row, date, config) {
+            const meta = config.highlightThreshold;
+            const numero = numeroValido(row._highlightDates?.[date]);
+            return Boolean(meta && numero !== null && numero >= meta.value);
+        }
+
+        function renderTable(pivot, fixedCols, config, metric) {
             const { rows, dates } = pivot;
             const nomesColunas = { MATRICULA: 'MATRÍCULA', NOME: 'NOME', CARGO: 'CARGO' };
             let thead = '<tr>';
@@ -598,11 +781,11 @@
             let tbody = '';
             rows.forEach(row => {
                 tbody += '<tr>';
-                fixedCols.forEach(c => tbody += `<td>${row[c]}</td>`);
+                fixedCols.forEach(c => tbody += `<td>${valorExibicao(row[c])}</td>`);
                 dates.forEach(d => {
                     const val = row._dates[d];
-                    // Exibir valor inteiro, sem casas decimais
-                    tbody += `<td>${val !== undefined ? Math.round(val) : ''}</td>`;
+                    const classeMeta = deveDestacarDia(row, d, config) ? ' class="meta-atingida"' : '';
+                    tbody += `<td${classeMeta}>${formatarNumero(val)}</td>`;
                 });
                 tbody += '</tr>';
             });
@@ -618,8 +801,8 @@
 
             rows.forEach(row => {
                 dates.forEach(d => {
-                    const val = row._dates[d];
-                    if (val !== undefined && val !== 0) {
+                    const val = numeroValido(row._dates[d]);
+                    if (val !== null) {
                         total += val;
                         count++;
                         if (val < min) min = val;
@@ -628,12 +811,13 @@
                 });
             });
 
-            const avg = count > 0 ? (total / count) : 0;
+            const semDados = count === 0;
+            const avg = count > 0 ? (total / count) : null;
             const cards = [
-                { label: 'Média', value: Math.round(avg) },
-                { label: 'Total', value: Math.round(total) },
-                { label: 'Máximo', value: max === -Infinity ? 0 : Math.round(max) },
-                { label: 'Mínimo', value: min === Infinity ? 0 : Math.round(min) }
+                { label: 'Média', value: semDados ? '-' : formatarNumero(avg) },
+                { label: 'Total', value: semDados ? '-' : formatarNumero(total) },
+                { label: 'Máximo', value: semDados ? '-' : formatarNumero(max) },
+                { label: 'Mínimo', value: semDados ? '-' : formatarNumero(min) }
             ];
 
             document.getElementById('cardsContainer').innerHTML = cards.map(c => `
