@@ -177,8 +177,7 @@
         </div>
         <div class="kpi-grid" id="kpiAbs"></div>
         <div class="filter-bar" style="flex-wrap: wrap;">
-            <div class="filter-group"><label>De:</label><input type="date" id="dataInicio" onchange="aplicarFiltroAbs()"></div>
-            <div class="filter-group"><label>Até:</label><input type="date" id="dataFim" onchange="aplicarFiltroAbs()"></div>
+            <div class="filter-group"><label>Período:</label><input type="month" id="filtroMes" onchange="aplicarFiltroAbs()"></div>
             <div class="filter-group"><label>Busca:</label><input type="text" id="filtroBusca" placeholder="Matrícula ou Nome" oninput="agendarAplicacaoFiltro()"></div>
             <div class="multi-select" id="msCargo"><div class="select-trigger" onclick="toggleDropdown('msCargo')">Cargo <i class="fa-solid fa-chevron-down"></i></div><div class="select-dropdown" id="cargoOptions"></div></div>
             <div class="multi-select" id="msTurno"><div class="select-trigger" onclick="toggleDropdown('msTurno')">Turno <i class="fa-solid fa-chevron-down"></i></div><div class="select-dropdown" id="turnoOptions"></div></div>
@@ -514,8 +513,14 @@
             filtroTimer = setTimeout(aplicarFiltroAbs, 180);
         }
         function aplicarFiltroAbs() {
-            const ini = document.getElementById('dataInicio').value, fim = document.getElementById('dataFim').value;
-            if (!ini || !fim) return;
+            const mesValor = document.getElementById('filtroMes').value; // "AAAA-MM"
+            if (!mesValor) return;
+
+            const [ano, mes] = mesValor.split('-').map(Number);
+            const ultimoDia = new Date(ano, mes, 0).getDate();
+            const ini = `${mesValor}-01`;
+            const fim = `${mesValor}-${String(ultimoDia).padStart(2, '0')}`;
+
             const token = ++renderToken;
             const diasTodos = gerarDias(ini, fim);
             const diasSel = getSelectedValues('diaSemanaOptions');
@@ -743,9 +748,12 @@
                 }
             } catch (e) { console.warn(e); }
             finally { hideLoading(); }
-            const hojeLocal = formatarISODataLocal(new Date());
-            document.getElementById('dataInicio').value = hojeLocal;
-            document.getElementById('dataFim').value = hojeLocal;
+
+            // Define o mês atual no filtro (formato AAAA-MM)
+            const hoje = new Date();
+            const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+            document.getElementById('filtroMes').value = mesAtual;
+
             initMultiSelects();
             aplicarFiltroAbs();
         }
@@ -777,9 +785,6 @@
                 }
             }
         });
-
-        // Se o index.html redirecionar com ?page=bases ou ?page=usuarios
-        // Tratar aqui? Não, isso é responsabilidade do index.
     </script>
 </body>
 </html>
