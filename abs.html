@@ -101,7 +101,38 @@
         .select-dropdown { position: absolute; top: 100%; left: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px; z-index: 50; min-width: 100%; display: none; max-height: 200px; overflow-y: auto; box-shadow: var(--shadow-md); }
         .multi-select.open .select-dropdown { display: block; }
         .select-dropdown label { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 0.78rem; cursor: pointer; }
-        .table-outer { border:1px solid #cbd5df; border-radius:7px; overflow:auto; background:var(--card); max-height:62vh; box-shadow:var(--shadow-md); }
+        
+        /* ====== ALTERAÇÕES DA TABELA E SCROLL ====== */
+        .table-outer { border:1px solid #cbd5df; border-radius:7px; background:var(--card); box-shadow:var(--shadow-md); display: flex; flex-direction: column; }
+        
+        /* Container da barra de rolagem superior */
+        #topScrollWrapper {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            scrollbar-width: thin;
+            scrollbar-color: var(--blue) var(--bg2);
+            border-radius: 7px 7px 0 0;
+        }
+        #topScrollWrapper::-webkit-scrollbar { height: 12px; }
+        #topScrollWrapper::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 6px; border: 2px solid var(--bg2); }
+        #topScrollWrapper::-webkit-scrollbar-track { background: var(--bg2); }
+        
+        /* Container real da tabela */
+        .table-scroll { max-height:55vh; overflow-y: auto; overflow-x: hidden; position: relative; }
+        
+        /* Esconde a barra horizontal nativa */
+        .table-scroll::-webkit-scrollbar:horizontal { display: none; }
+        .table-scroll { scrollbar-width: none; /* Firefox */ }
+        
+        /* Estilos da barra vertical */
+        .table-scroll::-webkit-scrollbar { width: 8px; }
+        .table-scroll::-webkit-scrollbar-thumb { background: #cbd5df; border-radius: 4px; }
+        .table-scroll::-webkit-scrollbar-track { background: transparent; }
+        /* ========================================= */
+
         table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; font-size:.70rem; }
         th { position:sticky; top:0; z-index:20; background:#172532; padding:8px 6px; text-align:center; font-weight:700; font-size:.60rem; text-transform:uppercase; color:#d7e4ef; border-bottom:2px solid #1677c8; letter-spacing:.35px; }
         td { padding:6px 6px; text-align:center; border-bottom:1px solid #e4e9ef; font-family:var(--mono); font-weight:600; }
@@ -185,7 +216,22 @@
             <div class="multi-select" id="msMotivo"><div class="select-trigger" onclick="toggleDropdown('msMotivo')">Motivo <i class="fa-solid fa-chevron-down"></i></div><div class="select-dropdown" id="motivoOptions"></div></div>
             <div class="multi-select" id="msFaixaEtaria"><div class="select-trigger" onclick="toggleDropdown('msFaixaEtaria')">Faixa Etária <i class="fa-solid fa-chevron-down"></i></div><div class="select-dropdown" id="faixaEtariaOptions"></div></div>
         </div>
-        <div class="table-outer"><div class="table-scroll" style="max-height:55vh;"><table id="tabelaAbs"><thead id="theadAbs"></thead><tbody id="tbodyAbs"></tbody></table></div></div>
+        
+        <!-- ESTRUTURA DA TABELA MODIFICADA -->
+        <div class="table-outer">
+            <!-- Barra de rolagem superior -->
+            <div id="topScrollWrapper">
+                <div id="topScrollSpacer" style="height: 1px;"></div>
+            </div>
+            <!-- Tabela com rolagem vertical e horizontal oculta -->
+            <div class="table-scroll" id="tableRealScroll">
+                <table id="tabelaAbs">
+                    <thead id="theadAbs"></thead>
+                    <tbody id="tbodyAbs"></tbody>
+                </table>
+            </div>
+        </div>
+        
         <div class="charts-grid" id="chartsAbs">
             <div class="chart-box"><h4>Média Diária por Motivo</h4><canvas id="chartMotivo"></canvas></div>
             <div class="chart-box"><h4>Média por Tempo de Casa</h4><canvas id="chartTempoCasa"></canvas></div>
@@ -460,6 +506,40 @@
             return Array.from(checks).map(cb => cb.value);
         }
         function toggleDropdown(msId) { document.getElementById(msId).classList.toggle('open'); }
+        
+        // ========== SINCRONIZAÇÃO DAS BARRAS DE ROLAGEM ==========
+        function syncTableScrollbars() {
+            const topWrapper = document.getElementById('topScrollWrapper');
+            const topSpacer = document.getElementById('topScrollSpacer');
+            const realScroll = document.getElementById('tableRealScroll');
+            const table = document.getElementById('tabelaAbs');
+            
+            if (!topWrapper || !topSpacer || !realScroll || !table) return;
+
+            const tableWidth = Math.max(table.scrollWidth, table.clientWidth);
+            
+            // Atualiza a largura do espaçador superior
+            topSpacer.style.width = tableWidth + 'px';
+
+            // Se a tabela for menor que a tela, esconde a barra superior e restaura a nativa
+            if (tableWidth <= topWrapper.clientWidth) {
+                topWrapper.style.display = 'none';
+                realScroll.style.overflowX = 'auto';
+            } else {
+                topWrapper.style.display = 'block';
+                realScroll.style.overflowX = 'hidden'; // Esconde a barra horizontal nativa
+            }
+
+            // Sincronizar rolagem top -> real
+            topWrapper.onscroll = () => {
+                realScroll.scrollLeft = topWrapper.scrollLeft;
+            };
+            // Sincronizar rolagem real -> top
+            realScroll.onscroll = () => {
+                topWrapper.scrollLeft = realScroll.scrollLeft;
+            };
+        }
+
         // ========== FILTRO E TABELA ==========
         function renderizarTabelaEmPartes(lista, dias, token) {
             const tbody = document.getElementById('tbodyAbs');
@@ -497,6 +577,8 @@
                     const resumo = calcularResumo(lista, dias);
                     atualizarKPIs(lista, dias, resumo);
                     executarQuandoOcioso(() => { if (token === renderToken) renderizarGraficos(lista, dias, resumo); });
+                    // Sincroniza as barras de rolagem após a tabela ser totalmente renderizada
+                    syncTableScrollbars(); 
                 }
             }
             if (!lista.length) {
@@ -504,14 +586,17 @@
                 const resumo = calcularResumo(lista, dias);
                 atualizarKPIs(lista, dias, resumo);
                 executarQuandoOcioso(() => { if (token === renderToken) renderizarGraficos(lista, dias, resumo); });
+                syncTableScrollbars();
                 return;
             }
             requestAnimationFrame(processarBloco);
         }
+        
         function agendarAplicacaoFiltro() {
             clearTimeout(filtroTimer);
             filtroTimer = setTimeout(aplicarFiltroAbs, 180);
         }
+        
         function aplicarFiltroAbs() {
             const mesValor = document.getElementById('filtroMes').value; // "AAAA-MM"
             if (!mesValor) return;
@@ -705,7 +790,6 @@
         document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => {
             const page = n.dataset.page;
             if (page === 'absenteismo') {
-                // Já está em abs.html
                 return;
             } else if (page === 'produtividade') {
                 window.location.href = 'produtividade.html';
@@ -749,7 +833,6 @@
             } catch (e) { console.warn(e); }
             finally { hideLoading(); }
 
-            // Define o mês atual no filtro (formato AAAA-MM)
             const hoje = new Date();
             const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
             document.getElementById('filtroMes').value = mesAtual;
@@ -784,6 +867,12 @@
                     sessionStorage.removeItem('hc_user');
                 }
             }
+            
+            // Ajusta as barras de rolagem se a janela for redimensionada
+            window.addEventListener('resize', () => {
+                clearTimeout(window.resizeTimer);
+                window.resizeTimer = setTimeout(syncTableScrollbars, 200);
+            });
         });
     </script>
 </body>
